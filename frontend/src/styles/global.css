@@ -1,0 +1,244 @@
+:root {
+  font-family: 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+  color: #2f3142;
+  background: linear-gradient(135deg, #f8f7ff 0%, #eef3ff 52%, #fff6fa 100%);
+  --primary: #7c6ff6;
+  --secondary: #8b7cf6;
+  --accent: #6c8cff;
+  --pink: #ffb8d2;
+  --mint: #a8e6cf;
+  --lavender-soft: #b8c6ff;
+  --text-primary: #2f3142;
+  --text-secondary: #5f6475;
+  --text-muted: #8a8fa3;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  min-height: 100vh;
+  overflow-x: hidden;
+  color: var(--text-primary);
+  background:
+    radial-gradient(circle at 12% 14%, rgba(188, 198, 255, 0.48), transparent 24%),
+    radial-gradient(circle at 88% 16%, rgba(255, 184, 210, 0.34), transparent 18%),
+    radial-gradient(circle at 82% 82%, rgba(168, 230, 207, 0.26), transparent 18%),
+    linear-gradient(135deg, #f8f7ff 0%, #eef3ff 52%, #fff6fa 100%);
+}
+
+a {
+  color: var(--primary);
+  text-decoration: none;
+}
+
+button,
+input,
+textarea {
+  font-family: inherit;
+}
+
+.floating-orb {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(24px);
+  opacity: 0.8;
+  pointer-events: none;
+  animation: floatBlob 12s ease-in-out infinite;
+}
+
+.floating-orb--one {
+  width: 260px;
+  height: 260px;
+  background: rgba(124, 111, 246, 0.26);
+  top: 6%;
+  left: 4%;
+}
+
+.floating-orb--two {
+  width: 220px;
+  height: 220px;
+  background: rgba(255, 184, 210, 0.26);
+  right: 6%;
+  top: 10%;
+  animation-delay: -3s;
+}
+
+.floating-orb--three {
+  width: 220px;
+  height: 220px;
+  background: rgba(108, 140, 255, 0.2);
+  right: 10%;
+  bottom: 4%;
+  animation-delay: -6s;
+}
+
+.el-form-item {
+  margin-bottom: 14px;
+}
+
+.el-form-item__error {
+  padding-top: 8px;
+  font-size: 12px;
+  color: #c27b8f;
+}
+
+.el-input__wrapper {
+  border-radius: 16px !important;
+  padding: 0 16px;
+  min-height: 50px;
+  background: rgba(255, 255, 255, 0.9) !important;
+  box-shadow: inset 0 0 0 1px rgba(124, 111, 246, 0.12) !important;
+  transition: box-shadow 0.24s var(--ease-out), transform 0.24s var(--ease-out), background 0.24s var(--ease-out);
+}
+
+.el-input__wrapper:hover {
+  box-shadow: inset 0 0 0 1px rgba(124, 111, 246, 0.2) !important;
+}
+
+.el-input.is-focus .el-input__wrapper,
+.el-input__wrapper.is-focus {
+  box-shadow: inset 0 0 0 1px rgba(124, 111, 246, 0.45), 0 0 0 4px rgba(124, 111, 246, 0.08) !important;
+}
+
+.el-input__inner {
+  color: var(--text-primary);
+}
+
+.primary-btn {
+  width: 100%;
+  min-height: 50px;
+  border: none;
+  border-radius: 16px;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 54%, var(--pink) 100%);
+  background-size: 200% 200%;
+  box-shadow: 0 18px 32px rgba(124, 111, 246, 0.24);
+  transition: transform 0.24s var(--ease-out), box-shadow 0.24s var(--ease-out), filter 0.24s var(--ease-out), background-position 0.5s var(--ease-out);
+}
+
+.primary-btn:hover {
+  transform: translateY(-2px);
+  filter: saturate(1.03);
+  background-position: 100% 50%;
+  box-shadow: 0 22px 38px rgba(124, 111, 246, 0.28);
+}
+
+.primary-btn:active {
+  transform: translateY(0);
+}
+
+.auth-link {
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 14px;
+  margin-top: 4px;
+}
+
+.auth-link a {
+  font-weight: 600;
+  position: relative;
+}
+
+.auth-link a::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -3px;
+  width: 100%;
+  height: 1px;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 0.24s var(--ease-out);
+}
+
+.auth-link a:hover::after {
+  transform: scaleX(1);
+}
+
+.page-fade-enter-active,
+.page-fade-leave-active {
+  transition: opacity 0.32s ease, transform 0.32s var(--ease-out);
+}
+
+.page-fade-enter-from,
+.page-fade-leave-to {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.page-fade-enter-to,
+.page-fade-leave-from {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translate3d(0, 20px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translate3d(0, -18px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes fadeInLeft {
+  from { opacity: 0; transform: translate3d(-20px, 0, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes fadeInRight {
+  from { opacity: 0; transform: translate3d(20px, 0, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes cardEnter {
+  from { opacity: 0; transform: translate3d(0, 18px, 0) scale(0.985); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+
+@keyframes staggerItem {
+  from { opacity: 0; transform: translate3d(0, 14px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes floatBlob {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(14px, -18px, 0) scale(1.04); }
+}
+
+@keyframes softPulse {
+  0%, 100% { transform: scale(1); opacity: 0.72; }
+  50% { transform: scale(1.02); opacity: 0.9; }
+}
+
+@keyframes flowGradient {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
