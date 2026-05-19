@@ -1,0 +1,33 @@
+INSERT INTO users (
+  username,
+  email,
+  password_hash,
+  nickname,
+  avatar,
+  role,
+  status,
+  created_at,
+  updated_at
+) VALUES
+(
+  'admin',
+  'admin@emotion.com',
+  '$bcrypt-sha256$v=2,t=2b,r=12$ydIK9Wq0q2BwL9zvbLLlIO$vCz1S8VbJO.TvTQQkJtK1NDHYGmPm4a',
+  '管理员',
+  '',
+  'admin',
+  'active',
+  NOW(),
+  NOW()
+),
+(
+  'superadmin',
+  'superadmin@emotion.com',
+  '$bcrypt-sha256$v=2,t=2b,r=12$j79FStk1kdTCKotgQXPdru$HyPvPR5Oi.SX2uOPew27QnTffZWiL/W',
+  '系统管理员',
+  '',
+  'super_admin',
+  'active',
+  NOW(),
+  NOW()
+);
