@@ -44,11 +44,53 @@ class UserLogin(BaseModel):
 class ProfileUpdate(BaseModel):
     nickname: Optional[str] = None
     avatar: Optional[str] = None
+    email: Optional[str] = None
+    occupation: Optional[str] = None
+    age: Optional[int] = Field(default=None, ge=0, le=150)
+    gender: Optional[str] = None
+
+    @field_validator("email")
+    @classmethod
+    def validate_profile_email(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return value
+        value = value.strip()
+        if not value:
+            raise ValueError("邮箱不能为空")
+        if "@" not in value or "." not in value:
+            raise ValueError("邮箱格式不正确")
+        return value
+
+    @field_validator("occupation")
+    @classmethod
+    def validate_occupation(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return value
+        value = value.strip()
+        return value or None
+
+    @field_validator("gender")
+    @classmethod
+    def validate_gender(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return value
+        value = value.strip()
+        if value and value not in {"male", "female", "other", "unknown"}:
+            raise ValueError("性别值不合法")
+        return value or None
 
 
 class PasswordChange(BaseModel):
     old_password: str
     new_password: str = Field(min_length=6)
+    confirm_password: str = Field(min_length=6)
+
+    @field_validator("confirm_password")
+    @classmethod
+    def validate_confirm_password(cls, value: str) -> str:
+        if len(value) < 6:
+            raise ValueError("密码长度不能少于6位")
+        return value
 
 
 class UserResponse(BaseModel):
@@ -59,6 +101,9 @@ class UserResponse(BaseModel):
     email: str
     nickname: Optional[str] = None
     avatar: Optional[str] = None
+    occupation: Optional[str] = None
+    age: Optional[int] = None
+    gender: Optional[str] = None
     role: str
 
 

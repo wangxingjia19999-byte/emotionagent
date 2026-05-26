@@ -11,6 +11,20 @@ from app.utils.security import hash_password, verify_password
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
+def _serialize_user(user: User) -> dict:
+    return {
+        "id": user.id,
+        "username": user.username,
+        "email": user.email,
+        "nickname": user.nickname or "",
+        "avatar": user.avatar or "",
+        "occupation": user.occupation or "",
+        "age": user.age,
+        "gender": user.gender or "",
+        "role": user.role,
+    }
+
+
 @router.post("/register")
 def register(payload: UserRegister, db: Session = Depends(get_db)):
     existing_username = db.query(User).filter(User.username == payload.username).first()
@@ -52,13 +66,6 @@ def login(payload: UserLogin, db: Session = Depends(get_db)):
     token = create_access_token(subject=str(user.id), extra_data={"username": user.username})
     response_data = {
         "token": token,
-        "user": {
-            "id": user.id,
-            "username": user.username,
-            "email": user.email,
-            "nickname": user.nickname or "",
-            "avatar": user.avatar or "",
-            "role": user.role,
-        },
+        "user": _serialize_user(user),
     }
     return {"code": 0, "message": "登录成功", "data": response_data}
