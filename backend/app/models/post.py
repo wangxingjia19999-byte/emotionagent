@@ -28,8 +28,11 @@ class Post(Base):
     image_urls = Column(Text, nullable=True)
     view_count = Column(Integer, nullable=False, default=0, server_default=text("0"))
     like_count = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    hug_count = Column(Integer, nullable=False, default=0, server_default=text("0"))
     comment_count = Column(Integer, nullable=False, default=0, server_default=text("0"))
     favorite_count = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    mood_tag = Column(String(30), nullable=True)
+    is_anonymous = Column(Boolean, nullable=False, default=False, server_default=text("0"))
     is_deleted = Column(Boolean, nullable=False, default=False, server_default=text("0"))
     created_at = Column(DateTime, nullable=False, server_default=func.now())
     updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
@@ -55,6 +58,19 @@ class Comment(Base):
 class PostLike(Base):
     __tablename__ = "likes"
     __table_args__ = (UniqueConstraint("post_id", "user_id", name="uq_likes_post_id_user_id"),)
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True, index=True)
+    post_id = Column(BigInteger, ForeignKey("posts.id"), nullable=False, index=True)
+    user_id = Column(BigInteger, ForeignKey("users.id"), nullable=False, index=True)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+
+    post = relationship("Post")
+    author = relationship("User")
+
+
+class PostHug(Base):
+    __tablename__ = "hugs"
+    __table_args__ = (UniqueConstraint("post_id", "user_id", name="uq_hugs_post_id_user_id"),)
 
     id = Column(BigInteger, primary_key=True, autoincrement=True, index=True)
     post_id = Column(BigInteger, ForeignKey("posts.id"), nullable=False, index=True)

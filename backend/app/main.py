@@ -6,9 +6,11 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import inspect, text
 
 from app.database import Base, engine
+from app.models import mcp_config as mcp_config_model  # noqa: F401
 from app.models import post as post_model  # noqa: F401
+from app.models import questionnaire as questionnaire_model  # noqa: F401
 from app.models import user as user_model  # noqa: F401
-from app.routers import auth, home, posts, user
+from app.routers import agent, auth, home, mcp, posts, questionnaire, user
 
 
 app = FastAPI(title="心语陪伴 API", version="1.0.0")
@@ -46,7 +48,29 @@ def startup_event() -> None:
     post_column_statements = {
         "image_url": "ALTER TABLE posts ADD COLUMN image_url VARCHAR(255) NULL",
         "image_urls": "ALTER TABLE posts ADD COLUMN image_urls TEXT NULL",
+        "mood_tag": "ALTER TABLE posts ADD COLUMN mood_tag VARCHAR(30) NULL",
+        "is_anonymous": "ALTER TABLE posts ADD COLUMN is_anonymous BOOLEAN NOT NULL DEFAULT FALSE",
+        "hug_count": "ALTER TABLE posts ADD COLUMN hug_count INT NOT NULL DEFAULT 0",
     }
+
+    # 确保 hugs 表存在
+    try:
+        hug_columns = {column["name"] for column in inspector.get_columns("hugs")}
+    except Exception:
+        hug_columns = set()
+    if not hug_columns:
+        with engine.begin() as connection:
+            connection.execute(text(
+                "CREATE TABLE IF NOT EXISTS hugs ("
+                "id BIGINT PRIMARY KEY AUTO_INCREMENT,"
+                "post_id BIGINT NOT NULL,"
+                "user_id BIGINT NOT NULL,"
+                "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,"
+                "INDEX idx_hugs_post_id (post_id),"
+                "INDEX idx_hugs_user_id (user_id),"
+                "UNIQUE KEY uq_hugs_post_id_user_id (post_id, user_id)"
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+            ))
 
     user_column_statements = {
         "occupation": "ALTER TABLE users ADD COLUMN occupation VARCHAR(100) NULL",
@@ -66,7 +90,10 @@ def startup_event() -> None:
 
 app.include_router(auth.router, prefix="/api")
 app.include_router(home.router, prefix="/api/home", tags=["首页"])
+app.include_router(agent.router, prefix="/api")
+app.include_router(mcp.router, prefix="/api")
 app.include_router(posts.router, prefix="/api")
+app.include_router(questionnaire.router, prefix="/api")
 app.include_router(user.router, prefix="/api")
 
 

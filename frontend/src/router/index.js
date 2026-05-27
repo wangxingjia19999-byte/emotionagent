@@ -13,6 +13,8 @@ const PrivateChat = () => import('../views/PrivateChat.vue')
 const PostDetail = () => import('../views/PostDetail.vue')
 const PublishPost = () => import('../views/PublishPost.vue')
 const Admin = () => import('../views/Admin.vue')
+const AgentConfig = () => import('../views/AgentConfig.vue')
+const DailyCheck = () => import('../views/DailyCheck.vue')
 
 const router = createRouter({
   history: createWebHistory(),
@@ -33,7 +35,9 @@ const router = createRouter({
         { path: 'private-chat', component: PrivateChat },
         { path: 'community/:id', component: PostDetail, props: true },
         { path: 'publish-post', component: PublishPost },
-        { path: 'admin', component: Admin }
+        { path: 'admin', component: Admin },
+        { path: 'agent-config', component: AgentConfig },
+        { path: 'daily-check', component: DailyCheck }
       ]
     }
   ]

@@ -1,7 +1,13 @@
 <template>
   <article class="post-card" role="button" tabindex="0" @click="$emit('click')" @keydown.enter="$emit('click')">
     <div class="post-card__header">
-      <el-tag size="small" effect="light" class="post-card__category">{{ post.category || '其他' }}</el-tag>
+      <div class="post-card__tags">
+        <el-tag size="small" effect="light" class="post-card__category">{{ post.category || '其他' }}</el-tag>
+        <el-tag v-if="post.mood_tag" size="small" effect="light" :class="['post-card__mood', `mood-${post.mood_tag}`]">
+          {{ post.mood_tag }}
+        </el-tag>
+        <el-tag v-if="post.is_anonymous" size="small" effect="light" class="post-card__anonymous">匿名</el-tag>
+      </div>
       <span class="post-card__time">{{ formattedTime }}</span>
     </div>
 
@@ -25,8 +31,8 @@
       <div class="post-card__stats">
         <span>浏览 {{ post.view_count || 0 }}</span>
         <span>赞 {{ post.like_count || 0 }}</span>
+        <span>抱 {{ post.hug_count || 0 }}</span>
         <span>评 {{ post.comment_count || 0 }}</span>
-        <span>藏 {{ post.favorite_count || 0 }}</span>
       </div>
     </div>
   </article>
@@ -103,9 +109,37 @@ const formattedTime = computed(() => {
   align-items: center;
 }
 
+.post-card__tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
 .post-card__category {
   border-radius: 999px;
 }
+
+.post-card__mood {
+  border-radius: 999px;
+}
+
+.post-card__anonymous {
+  border-radius: 999px;
+  background: #f0edff;
+  color: #7c6ff6;
+  border-color: #d8d0ff;
+}
+
+/* 情绪标签颜色 */
+.mood-开心 { background: #fff7e6; color: #d48806; border-color: #ffe7ba; }
+.mood-难过 { background: #e6f7ff; color: #1890ff; border-color: #bae7ff; }
+.mood-焦虑 { background: #fff1f0; color: #ff4d4f; border-color: #ffccc7; }
+.mood-愤怒 { background: #fff0f6; color: #eb2f96; border-color: #ffd6e7; }
+.mood-温暖 { background: #fff7e6; color: #fa8c16; border-color: #ffe7ba; }
+.mood-平静 { background: #f6ffed; color: #52c41a; border-color: #d9f7be; }
+.mood-孤独 { background: #f9f0ff; color: #722ed1; border-color: #efdbff; }
+.mood-恐惧 { background: #e6fffb; color: #13c2c2; border-color: #b5f5ec; }
+.mood-感激 { background: #fcffe6; color: #7cb305; border-color: #eaff8f; }
 
 .post-card__time {
   font-size: 12px;

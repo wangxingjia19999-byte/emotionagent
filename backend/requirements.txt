@@ -8,3 +8,13 @@ passlib[bcrypt]==1.7.4
 bcrypt==3.2.2
 python-jose[cryptography]==3.3.0
 pydantic==2.9.2
+# MCP (Model Context Protocol) 集成
+mcp>=1.0.0
+langchain-mcp-adapters>=0.1.0
+# LangChain 相关 (Agent 已有依赖)
+langchain>=0.3.0
+langchain-core>=0.3.0
+langchain-openai>=0.2.0
+langchain-chroma>=0.2.0
+langchain-huggingface>=0.1.0
+langgraph>=0.2.0

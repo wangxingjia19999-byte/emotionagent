@@ -25,6 +25,17 @@
             </el-select>
           </el-form-item>
 
+          <el-form-item label="此刻情绪">
+            <el-select v-model="form.mood_tag" placeholder="选择情绪标签（可选）" clearable>
+              <el-option v-for="item in moodOptions" :key="item.value" :label="item.label" :value="item.value" />
+            </el-select>
+          </el-form-item>
+
+          <el-form-item label="匿名发布" class="form-switch-item">
+            <el-switch v-model="form.is_anonymous" />
+            <span class="switch-hint">开启后其他用户看不到你的身份信息</span>
+          </el-form-item>
+
           <el-form-item label="正文" prop="content" class="span-2">
             <el-input
               v-model="form.content"
@@ -113,9 +124,23 @@ const categoryOptions = [
   { label: '其他', value: '其他' }
 ]
 
+const moodOptions = [
+  { label: '开心', value: '开心' },
+  { label: '难过', value: '难过' },
+  { label: '焦虑', value: '焦虑' },
+  { label: '愤怒', value: '愤怒' },
+  { label: '温暖', value: '温暖' },
+  { label: '平静', value: '平静' },
+  { label: '孤独', value: '孤独' },
+  { label: '恐惧', value: '恐惧' },
+  { label: '感激', value: '感激' }
+]
+
 const form = reactive({
   title: '',
   category: '',
+  mood_tag: '',
+  is_anonymous: false,
   content: '',
   image_url: '',
   image_urls: []
@@ -150,6 +175,8 @@ const resolveImageUrl = (value) => {
 const resetForm = () => {
   form.title = ''
   form.category = ''
+  form.mood_tag = ''
+  form.is_anonymous = false
   form.content = ''
   form.image_url = ''
   form.image_urls = []
@@ -231,6 +258,8 @@ const loadPostForEdit = async (id) => {
     const data = payload.data || payload
     form.title = data.title || ''
     form.category = data.category || ''
+    form.mood_tag = data.mood_tag || ''
+    form.is_anonymous = Boolean(data.is_anonymous)
     form.content = data.content || ''
     form.image_urls = Array.isArray(data.image_urls) && data.image_urls.length ? data.image_urls.slice(0, 9) : (data.image_url ? [data.image_url] : [])
     form.image_url = form.image_urls[0] || ''
@@ -254,6 +283,8 @@ const submitPost = async () => {
       const payload = {
         title: form.title.trim(),
         category: form.category,
+        mood_tag: form.mood_tag || null,
+        is_anonymous: form.is_anonymous,
         content: form.content.trim(),
         image_url: form.image_urls[0] || null,
         image_urls: form.image_urls
@@ -363,6 +394,17 @@ onMounted(() => {
   justify-content: flex-end;
   gap: 12px;
   margin-top: 8px;
+}
+
+.form-switch-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.switch-hint {
+  font-size: 12px;
+  color: #8a90a3;
 }
 
 .publish-actions__ghost {

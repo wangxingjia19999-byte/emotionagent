@@ -16,8 +16,12 @@
       </div>
 
       <div class="community-toolbar__filters">
-        <el-select v-model="filters.category" class="community-select" @change="applyFilters">
+        <el-select v-model="filters.category" class="community-select" @change="applyFilters" placeholder="分类">
           <el-option v-for="item in categoryOptions" :key="item.value" :label="item.label" :value="item.value" />
+        </el-select>
+
+        <el-select v-model="filters.mood_tag" class="community-select" @change="applyFilters" placeholder="情绪" clearable>
+          <el-option v-for="item in moodOptions" :key="item.value" :label="item.label" :value="item.value" />
         </el-select>
 
         <el-radio-group v-model="filters.sort" class="community-sort" @change="applyFilters">
@@ -81,16 +85,30 @@ const pageSize = ref(10)
 const filters = reactive({
   keyword: '',
   category: '',
+  mood_tag: '',
   sort: 'latest'
 })
 
 const categoryOptions = [
-  { label: '全部', value: '' },
+  { label: '全部分类', value: '' },
   { label: '情绪倾诉', value: '情绪倾诉' },
   { label: '学习生活', value: '学习生活' },
   { label: '人际关系', value: '人际关系' },
   { label: '校园日常', value: '校园日常' },
   { label: '其他', value: '其他' }
+]
+
+const moodOptions = [
+  { label: '全部情绪', value: '' },
+  { label: '开心', value: '开心' },
+  { label: '难过', value: '难过' },
+  { label: '焦虑', value: '焦虑' },
+  { label: '愤怒', value: '愤怒' },
+  { label: '温暖', value: '温暖' },
+  { label: '平静', value: '平静' },
+  { label: '孤独', value: '孤独' },
+  { label: '恐惧', value: '恐惧' },
+  { label: '感激', value: '感激' }
 ]
 
 const normalizePayload = (response) => response?.data ?? response ?? {}
@@ -108,6 +126,7 @@ const loadPosts = async () => {
       page_size: pageSize.value,
       keyword: filters.keyword?.trim() || undefined,
       category: filters.category || undefined,
+      mood_tag: filters.mood_tag || undefined,
       sort: filters.sort
     })
     const payload = normalizePayload(response)
@@ -132,6 +151,7 @@ const applyFilters = () => {
 const resetFilters = () => {
   filters.keyword = ''
   filters.category = ''
+  filters.mood_tag = ''
   filters.sort = 'latest'
   page.value = 1
   loadPosts()

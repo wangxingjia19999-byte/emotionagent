@@ -12,6 +12,11 @@ ALLOWED_POST_CATEGORIES = {
     "其他",
 }
 
+ALLOWED_MOOD_TAGS = {
+    "开心", "难过", "焦虑", "愤怒", "温暖",
+    "平静", "孤独", "恐惧", "惊讶", "感激",
+}
+
 
 class PostAuthorResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -27,6 +32,8 @@ class PostCreate(BaseModel):
     title: str = Field(min_length=1, max_length=100)
     content: str = Field(min_length=1)
     category: Optional[str] = Field(default="其他", max_length=50)
+    mood_tag: Optional[str] = Field(default=None, max_length=30)
+    is_anonymous: bool = False
     image_url: Optional[str] = Field(default=None, max_length=255)
     image_urls: list[str] = Field(default_factory=list)
 
@@ -75,6 +82,8 @@ class PostUpdate(BaseModel):
     title: Optional[str] = Field(default=None, max_length=100)
     content: Optional[str] = None
     category: Optional[str] = Field(default=None, max_length=50)
+    mood_tag: Optional[str] = Field(default=None, max_length=30)
+    is_anonymous: Optional[bool] = None
     image_url: Optional[str] = Field(default=None, max_length=255)
     image_urls: Optional[list[str]] = None
 
@@ -155,10 +164,13 @@ class PostItemResponse(BaseModel):
     title: str
     content: str
     category: str = "其他"
+    mood_tag: Optional[str] = None
+    is_anonymous: bool = False
     image_url: Optional[str] = None
     image_urls: list[str] = Field(default_factory=list)
     view_count: int = 0
     like_count: int = 0
+    hug_count: int = 0
     comment_count: int = 0
     favorite_count: int = 0
     created_at: datetime
@@ -168,6 +180,7 @@ class PostItemResponse(BaseModel):
 
 class PostDetailResponse(PostItemResponse):
     liked: bool = False
+    hugged: bool = False
     favorited: bool = False
 
 

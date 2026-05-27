@@ -10,7 +10,13 @@
       <template v-else-if="post">
         <article class="post-main glass-card">
           <div class="post-main__top">
-            <el-tag effect="light" class="post-main__category">{{ post.category || '其他' }}</el-tag>
+            <div class="post-main__tag-row">
+              <el-tag effect="light" class="post-main__category">{{ post.category || '其他' }}</el-tag>
+              <el-tag v-if="post.mood_tag" effect="light" :class="['post-main__mood', `mood-${post.mood_tag}`]">
+                {{ post.mood_tag }}
+              </el-tag>
+              <el-tag v-if="post.is_anonymous" effect="light" class="post-main__anonymous">匿名发布</el-tag>
+            </div>
             <div class="post-main__meta">浏览 {{ post.view_count || 0 }}</div>
           </div>
 
@@ -52,6 +58,9 @@
           <div class="post-main__actions">
             <el-button class="action-button" :class="{ 'is-active': liked }" @click="toggleLike">
               {{ liked ? '已点赞' : '点赞' }} · {{ post.like_count || 0 }}
+            </el-button>
+            <el-button class="action-button" :class="{ 'is-active': hugged }" @click="toggleHug">
+              {{ hugged ? '已抱抱' : '抱抱' }} · {{ post.hug_count || 0 }}
             </el-button>
             <el-button class="action-button" :class="{ 'is-active': favorited }" @click="toggleFavorite">
               {{ favorited ? '已收藏' : '收藏' }} · {{ post.favorite_count || 0 }}
@@ -141,7 +150,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import EmptyState from '../components/EmptyState.vue'
-import { deleteComment, deletePost, favoritePost, getComments, getPostDetail, likePost, unfavoritePost, unlikePost, createComment } from '../api/posts'
+import { deleteComment, deletePost, favoritePost, getComments, getPostDetail, hugPost, likePost, unfavoritePost, unhugPost, unlikePost, createComment } from '../api/posts'
 
 const route = useRoute()
 const router = useRouter()
@@ -170,6 +179,7 @@ const currentUser = computed(() => {
 const postId = computed(() => Number(route.params.id))
 const isAuthor = computed(() => currentUser.value && post.value && Number(currentUser.value.id) === Number(post.value.user_id))
 const liked = computed(() => Boolean(post.value?.liked))
+const hugged = computed(() => Boolean(post.value?.hugged))
 const favorited = computed(() => Boolean(post.value?.favorited))
 const authorText = computed(() => (post.value?.author?.nickname || post.value?.author?.username || '匿').slice(0, 1))
 const postImages = computed(() => {
@@ -274,6 +284,23 @@ const toggleLike = async () => {
   } catch (error) {
     const message = error?.response?.data?.detail || error?.message || '点赞操作失败'
     ElMessage.error(message)
+  }
+}
+
+const toggleHug = async () => {
+  if (!post.value) return
+  try {
+    const response = hugged.value ? await unhugPost(post.value.id) : await hugPost(post.value.id)
+    const payload = normalizePayload(response)
+    const data = payload.data || payload
+    if (!post.value) return
+    post.value = {
+      ...post.value,
+      hug_count: data.hug_count ?? post.value.hug_count,
+      hugged: Boolean(data.hugged)
+    }
+  } catch (error) {
+    ElMessage.error(error?.response?.data?.detail || '操作失败')
   }
 }
 
@@ -416,9 +443,37 @@ onMounted(() => {
   align-items: center;
 }
 
+.post-main__tag-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
 .post-main__category {
   border-radius: 999px;
 }
+
+.post-main__mood {
+  border-radius: 999px;
+}
+
+.post-main__anonymous {
+  border-radius: 999px;
+  background: #f0edff;
+  color: #7c6ff6;
+  border-color: #d8d0ff;
+}
+
+.mood-开心 { background: #fff7e6; color: #d48806; border-color: #ffe7ba; }
+.mood-难过 { background: #e6f7ff; color: #1890ff; border-color: #bae7ff; }
+.mood-焦虑 { background: #fff1f0; color: #ff4d4f; border-color: #ffccc7; }
+.mood-愤怒 { background: #fff0f6; color: #eb2f96; border-color: #ffd6e7; }
+.mood-温暖 { background: #fff7e6; color: #fa8c16; border-color: #ffe7ba; }
+.mood-平静 { background: #f6ffed; color: #52c41a; border-color: #d9f7be; }
+.mood-孤独 { background: #f9f0ff; color: #722ed1; border-color: #efdbff; }
+.mood-恐惧 { background: #e6fffb; color: #13c2c2; border-color: #b5f5ec; }
+.mood-感激 { background: #fcffe6; color: #7cb305; border-color: #eaff8f; }
 
 .post-main__meta {
   color: #8a90a3;
