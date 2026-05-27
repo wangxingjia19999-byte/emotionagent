@@ -13,6 +13,8 @@ _base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _base_dir not in sys.path:
     sys.path.insert(0, _base_dir)
 
+from app.config import settings as app_settings
+
 class AgentService:
     """
     Agent 服务层，用于与 FastAPI 后端提供单例交互接口。
@@ -33,12 +35,15 @@ class AgentService:
             base_dir = os.path.dirname(os.path.abspath(__file__))
             db_path = os.path.join(base_dir, "RAG", "chroma_db")
             
-            print("⏳ 正在初始化 Emotion Analyst Agent...")
+            import logging
+            logger = logging.getLogger("app")
+            logger.info("initializing_emotion_agent")
             self._agent = EmotionAnalystRAG(
                 vector_db_uri=db_path,
-                llm_model_name=os.getenv("OPENAI_MODEL_NAME", "qwen-plus")
+                llm_model_name=app_settings.openai_model_name
             )
-            print("✅ Emotion Analyst Agent 初始化完成。")
+            import logging
+            logging.getLogger("app").info("emotion_agent_ready")
 
     def chat(self, user_input: str) -> str:
         """

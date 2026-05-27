@@ -138,7 +138,9 @@ const rules = {
   nickname: [],
   password: [
     { required: true, message: '密码不能为空', trigger: 'blur' },
-    { min: 6, message: '密码长度不能少于6位', trigger: 'blur' }
+    { min: 8, message: '密码长度不能少于8位', trigger: 'blur' },
+    { pattern: /[a-zA-Z]/, message: '密码必须包含至少一个字母', trigger: 'blur' },
+    { pattern: /\d/, message: '密码必须包含至少一个数字', trigger: 'blur' }
   ],
   confirmPassword: [{ validator: validateConfirmPassword, trigger: 'blur' }]
 }

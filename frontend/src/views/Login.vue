@@ -130,7 +130,8 @@ const onLogin = () => {
         password: form.password,
         role: currentRole.value
       })
-      localStorage.setItem('token', res.data.token)
+      localStorage.setItem('access_token', res.data.access_token)
+      localStorage.setItem('refresh_token', res.data.refresh_token)
       localStorage.setItem('user', JSON.stringify(res.data.user))
       ElMessage.success('登录成功')
       router.push('/home')

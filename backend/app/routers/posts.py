@@ -26,6 +26,7 @@ from app.schemas.post import (
     PostPageResponse,
     PostUpdate,
 )
+from app.utils.audit import audit_log
 from app.utils.jwt import get_current_user
 
 
@@ -442,6 +443,8 @@ def delete_comment(
         db.rollback()
         raise
 
+    audit_log(current_user.id, "delete_comment", "comment", comment.id)
+
     response = CommentActionResponse.model_validate(
         {"comment_id": comment.id, "post_id": comment.post_id}
     )
@@ -771,6 +774,8 @@ def delete_post(
     except Exception:
         db.rollback()
         raise
+
+    audit_log(current_user.id, "delete_post", "post", post.id, detail={"title": post.title})
 
     return {
         "code": 0,

@@ -7,6 +7,7 @@
 - MCP 外部工具调用（搜索、抓取、天气等）
 """
 
+import logging
 import os
 from typing import Any
 
@@ -15,6 +16,7 @@ from langgraph.prebuilt import create_react_agent
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.tools import BaseTool
 
+from app.config import settings as app_settings
 from .agent_service import (
     query_emotion_knowledge_base,
     emotion_scale_assessment,
@@ -67,14 +69,14 @@ class MCPEmotionAgent:
     def _get_llm(self):
         """懒加载 LLM，避免导入时因缺少 API key 而报错"""
         if self._llm is None:
-            api_key = os.getenv("OPENAI_API_KEY")
+            api_key = app_settings.openai_api_key
             if not api_key:
                 raise RuntimeError("未配置 OPENAI_API_KEY，请在 .env 中设置")
             self._llm = ChatOpenAI(
-                model=os.getenv("OPENAI_MODEL_NAME", "qwen-plus"),
+                model=app_settings.openai_model_name,
                 temperature=0.4,
                 api_key=api_key,
-                base_url=os.getenv("OPENAI_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
+                base_url=app_settings.openai_base_url,
             )
         return self._llm
 

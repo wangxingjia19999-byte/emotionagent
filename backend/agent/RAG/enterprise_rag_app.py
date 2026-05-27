@@ -1,11 +1,18 @@
 import os
+import sys
 from pathlib import Path
+
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough
 from langchain_chroma import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_openai import ChatOpenAI
+
+# 确保可以导入 app.config
+_base = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if _base not in sys.path:
+    sys.path.insert(0, _base)
 
 class EmotionAnalystRAG:
     """
@@ -38,12 +45,12 @@ class EmotionAnalystRAG:
         )
         
         # 3. 配置支持多查询(Multi-Query)的高级 Retriever，提升检索鲁棒性
-        api_key = os.getenv("OPENAI_API_KEY")
+        from app.config import settings as app_settings
         self.llm = ChatOpenAI(
             model=llm_model_name,
             temperature=temperature,
-            api_key=api_key,
-            base_url=os.getenv("OPENAI_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1")
+            api_key=app_settings.openai_api_key,
+            base_url=app_settings.openai_base_url,
         )
         base_retriever = self.vectorstore.as_retriever(search_kwargs={"k": 3})
         try:
