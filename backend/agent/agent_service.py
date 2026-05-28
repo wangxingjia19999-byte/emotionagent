@@ -326,3 +326,232 @@ def get_questionnaire_history(user_id: str, scale_type: str = "", days: int = 30
         return "\n".join(lines)
     finally:
         db.close()
+
+
+# --- 商城与推荐工具 ---
+
+
+@tool
+def get_shop_categories() -> str:
+    """
+    获取商城所有商品分类列表。
+    当用户提到想买东西、想购物、问有什么商品类别、或者想通过购物缓解情绪时调用。
+    返回分类名称和描述，帮助了解商城有哪些类型的商品。
+    """
+    from app.models.shop import ProductCategory
+
+    db = _get_db_session()
+    try:
+        categories = db.query(ProductCategory).order_by(ProductCategory.sort_order).all()
+        if not categories:
+            return "商城暂无分类。"
+        lines = ["商城商品分类:"]
+        for c in categories:
+            lines.append(f"  [{c.id}] {c.name} - {c.description}")
+        return "\n".join(lines)
+    finally:
+        db.close()
+
+
+@tool
+def get_shop_products(
+    category_id: str = "",
+    keyword: str = "",
+    sort: str = "default",
+    limit: int = 10,
+) -> str:
+    """
+    获取商城商品列表。支持按分类、关键词搜索、排序。
+    当用户想浏览商品、搜索特定商品、或需要根据用户情绪推荐商品时调用。
+    category_id: 分类ID（数字字符串），留空则返回所有分类的商品
+    keyword: 搜索关键词，按商品名称搜索
+    sort: 排序方式，可选 default(默认)/sales(销量)/price_asc(价格升序)/price_desc(价格降序)
+    limit: 返回数量上限，默认10
+    """
+    from app.models.shop import Product
+
+    db = _get_db_session()
+    try:
+        q = db.query(Product).filter(Product.is_on_sale == 1)
+
+        if category_id:
+            q = q.filter(Product.category_id == int(category_id))
+        if keyword:
+            q = q.filter(Product.name.contains(keyword))
+
+        if sort == "sales":
+            q = q.order_by(Product.sales_count.desc())
+        elif sort == "price_asc":
+            q = q.order_by(Product.price)
+        elif sort == "price_desc":
+            q = q.order_by(Product.price.desc())
+        else:
+            q = q.order_by(Product.sort_order, Product.id.desc())
+
+        products = q.limit(max(1, min(limit, 20))).all()
+
+        if not products:
+            return "没有找到符合条件的商品。可以换个关键词或分类试试。"
+
+        lines = ["商品列表:"]
+        for p in products:
+            cat_name = p.category.name if p.category else "未分类"
+            ptype = "服务" if p.product_type == "service" else "实物"
+            lines.append(
+                f"  [{p.id}] {p.name} | 分类:{cat_name} | 价格:¥{float(p.price):.2f} "
+                f"(原价:¥{float(p.original_price):.2f}) | 类型:{ptype} | 销量:{p.sales_count}\n"
+                f"      描述: {p.description[:120]}"
+            )
+        return "\n".join(lines)
+    finally:
+        db.close()
+
+
+@tool
+def recommend_shop_products(user_id: str, emotion_label: str = "", limit: int = 5) -> str:
+    """
+    根据用户的情绪状态推荐商城商品。这是核心推荐工具。
+    先分析用户近期的情绪记录和问卷结果，再结合商城商品进行个性化推荐。
+    当用户表达情绪困扰、问"有没有什么推荐的"、或想要通过购物来缓解情绪时使用。
+    user_id: 用户ID
+    emotion_label: 当前情绪标签（如焦虑/悲伤/压力/低落/愤怒/孤独），留空则自动从历史记录推断
+    limit: 推荐数量，默认5
+    """
+    from app.models.emotion_log import EmotionLog
+    from app.models.questionnaire import QuestionnaireRecord
+    from app.models.shop import Product, ProductCategory
+    from app.schemas.questionnaire import SCALES as _SCALES
+
+    db = _get_db_session()
+    try:
+        uid = int(user_id)
+
+        # 1. 收集用户情绪数据
+        recent_logs = (
+            db.query(EmotionLog)
+            .filter(EmotionLog.user_id == uid)
+            .order_by(EmotionLog.created_at.desc())
+            .limit(10)
+            .all()
+        )
+
+        recent_questionnaire = (
+            db.query(QuestionnaireRecord)
+            .filter(QuestionnaireRecord.user_id == uid)
+            .order_by(QuestionnaireRecord.created_at.desc())
+            .first()
+        )
+
+        # 2. 分析情绪状态
+        analysis_parts = []
+
+        if recent_logs:
+            emotion_counts: dict[str, int] = {}
+            for log in recent_logs:
+                label = log.emotion_label
+                emotion_counts[label] = emotion_counts.get(label, 0) + 1
+            top_emotion = max(emotion_counts, key=emotion_counts.get)
+            if not emotion_label:
+                emotion_label = top_emotion
+            analysis_parts.append(
+                f"近期主要情绪: {top_emotion} (共{len(recent_logs)}条记录中占{emotion_counts[top_emotion]}次)"
+            )
+        else:
+            analysis_parts.append("暂无情绪记录")
+
+        if recent_questionnaire:
+            scale_name = _SCALES.get(recent_questionnaire.scale_type, {}).get(
+                "name", recent_questionnaire.scale_type
+            )
+            analysis_parts.append(
+                f"最近问卷: {scale_name}，得分{recent_questionnaire.total_score}，等级:{recent_questionnaire.result_level}"
+            )
+
+        # 3. 情绪 → 分类映射
+        emotion_category_map: dict[str, list[str]] = {
+            "焦虑": ["解压玩具", "香薰好物", "解压服务"],
+            "悲伤": ["身心好物", "香薰好物", "解压服务"],
+            "压力": ["解压玩具", "解压服务", "身心好物"],
+            "低落": ["身心好物", "香薰好物", "解压玩具"],
+            "愤怒": ["解压玩具", "解压服务"],
+            "孤独": ["身心好物", "解压服务", "香薰好物"],
+            "恐惧": ["身心好物", "香薰好物"],
+            "惊讶": ["解压玩具", "身心好物"],
+            "平静": ["香薰好物", "身心好物", "解压玩具"],
+        }
+
+        target_categories = emotion_category_map.get(emotion_label, ["解压玩具", "香薰好物", "身心好物"])
+
+        # 4. 根据分类查询商品
+        recommendations = []
+        for cat_name in target_categories:
+            if len(recommendations) >= limit:
+                break
+            category = db.query(ProductCategory).filter(ProductCategory.name == cat_name).first()
+            if not category:
+                continue
+            products = (
+                db.query(Product)
+                .filter(
+                    Product.category_id == category.id,
+                    Product.is_on_sale == 1,
+                )
+                .order_by(Product.sales_count.desc())
+                .limit(3)
+                .all()
+            )
+            for p in products:
+                if len(recommendations) >= limit:
+                    break
+                if p.id not in [r["id"] for r in recommendations]:
+                    recommendations.append({
+                        "id": p.id,
+                        "name": p.name,
+                        "category": cat_name,
+                        "price": float(p.price),
+                        "original_price": float(p.original_price),
+                        "description": p.description[:150],
+                        "sales_count": p.sales_count,
+                        "product_type": p.product_type,
+                    })
+
+        if not recommendations:
+            return "暂时没有适合的推荐商品。"
+
+        # 5. 构建推荐回复
+        emotion_cn_map = {
+            "焦虑": "焦虑的时候，给自己一些安抚和掌控感会很有帮助",
+            "悲伤": "悲伤的时候，温柔的自我照料是最好的礼物",
+            "压力": "压力大的时候，适当地给身心放个假很重要",
+            "低落": "情绪低落时，一些温暖的小物件可以带来安慰",
+            "愤怒": "愤怒需要出口，捏一捏揉一揉会好很多",
+            "孤独": "感到孤独的时候，送自己一份陪伴和温暖",
+            "恐惧": "害怕的时候，创造安全感是最好的疗愈",
+            "平静": "保持这份平静，选些好物来滋养自己",
+        }
+
+        intro = emotion_cn_map.get(emotion_label, "根据你当前的情绪状态，为你推荐以下商品")
+
+        lines = ["=" * 40]
+        lines.append("个性化推荐")
+        lines.append("=" * 40)
+        lines.append("\n【情绪分析】")
+        lines.extend(analysis_parts)
+        lines.append(f"\n推荐理由: {intro}")
+        lines.append(f"\n【为你推荐以下 {len(recommendations)} 件商品】")
+
+        for i, item in enumerate(recommendations, 1):
+            ptype = "服务" if item["product_type"] == "service" else "实物"
+            lines.append(
+                f"\n  {i}. [{item['category']}] {item['name']}\n"
+                f"     价格: ¥{item['price']:.2f} (原价 ¥{item['original_price']:.2f}) | {ptype}\n"
+                f"     {item['description']}"
+            )
+
+        lines.append(
+            "\n提示: 以上推荐基于你的情绪状态和商品销量综合考量。"
+        )
+
+        return "\n".join(lines)
+    finally:
+        db.close()

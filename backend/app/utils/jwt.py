@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import get_db
 from app.models.user import User
+from app.models.admin import Admin
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -55,3 +56,30 @@ def get_current_user(
     if user.status != "active":
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="用户已被禁用")
     return user
+
+
+def get_current_admin(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+    db: Session = Depends(get_db),
+) -> Admin:
+    """获取当前管理员身份（从 admins 表），仅接受管理员 JWT"""
+    if credentials is None or credentials.scheme.lower() != "bearer":
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="未登录或 Token 缺失")
+
+    payload = decode_token(credentials.credentials)
+    if payload.get("type") != "access":
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="请使用 access token")
+
+    if not payload.get("is_admin"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="非管理员 token，请通过管理员入口登录")
+
+    subject = payload.get("sub")
+    if not subject:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token 无效")
+
+    admin = db.query(Admin).filter(Admin.id == int(subject)).first()
+    if not admin:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="管理员不存在")
+    if admin.status != "active":
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="管理员已被禁用")
+    return admin

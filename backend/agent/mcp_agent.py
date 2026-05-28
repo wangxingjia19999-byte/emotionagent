@@ -26,6 +26,9 @@ from .agent_service import (
     get_emotion_history,
     save_emotion_log,
     get_questionnaire_history,
+    get_shop_categories,
+    get_shop_products,
+    recommend_shop_products,
 )
 from .mcp_manager import mcp_manager, load_preset_mcp_configs
 
@@ -58,6 +61,9 @@ class MCPEmotionAgent:
             get_emotion_history,
             save_emotion_log,
             get_questionnaire_history,
+            get_shop_categories,
+            get_shop_products,
+            recommend_shop_products,
         ]
 
         self._mcp_tools: list[BaseTool] = []
@@ -137,10 +143,17 @@ class MCPEmotionAgent:
 - 不要在任何情况下说教、否定或轻描淡写
 
 可以使用的工具（按需调用，不要每次都全用）：
+情绪陪伴类：
 - 遇到不懂的情绪问题，可以调用 `query_emotion_knowledge_base` 查一下陪伴知识和回应思路
 - 想了解之前聊了什么，可以调用 `get_recent_memory`
 - 聊完后，用 `save_conversation_memory` 记一下要点
+- 可以调用 `get_user_profile` 了解用户的个人画像（年龄、职业、压力来源等）
+- 可以调用 `get_emotion_history` 和 `get_questionnaire_history` 了解用户近期的情绪状态和变化趋势
 - 如果对方持续描述焦虑/抑郁的症状，可以委婉地邀请用 `emotion_scale_assessment` 做个小评估，但不要强迫
+
+商城与推荐类：
+- 当用户想浏览或搜索商品时，调用 `get_shop_categories` 或 `get_shop_products`
+- 当用户表达情绪困扰、问"有什么推荐的吗"、或你想主动关心并推荐一些减压好物时，调用 `recommend_shop_products` 根据用户的真实情绪状态做个性化推荐。推荐完后可以用自然的语气介绍，比如"我看你最近压力挺大的，商城里有几个减压的小东西，要不要看看？"
 {mcp_desc}
 
 安全提醒（只在确实遇到危机信号时才自然提及）：

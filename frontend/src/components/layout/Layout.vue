@@ -30,6 +30,14 @@
     </div>
 
     <LogoutDialog v-model="logoutVisible" @confirm="confirmLogout" />
+
+    <!-- 管理员入口浮动按钮 -->
+    <button
+      v-if="isAdmin"
+      class="admin-fab"
+      title="管理后台"
+      @click="router.push('/admin')"
+    >⚙</button>
   </div>
 </template>
 
@@ -46,6 +54,11 @@ const router = useRouter()
 const route = useRoute()
 const logoutVisible = ref(false)
 const currentUser = ref(loadCurrentUser())
+
+const isAdmin = computed(() => {
+  const role = currentUser.value?.role
+  return role === 'admin' || role === 'super_admin'
+})
 
 const pageKey = computed(() => {
   if (route.path.startsWith('/ai-chat')) return 'ai-chat'
@@ -215,5 +228,30 @@ onBeforeUnmount(() => {
     padding: 12px;
     gap: 12px;
   }
+}
+
+.admin-fab {
+  position: fixed;
+  bottom: 28px;
+  right: 28px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: none;
+  background: linear-gradient(135deg, #1a1a2e, #16213e);
+  color: #64ffda;
+  font-size: 20px;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+  z-index: 999;
+  transition: transform 0.2s, box-shadow 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.admin-fab:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 24px rgba(0,0,0,0.35);
 }
 </style>

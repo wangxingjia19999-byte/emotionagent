@@ -209,7 +209,9 @@ def login(request: Request, payload: UserLogin, db: Session = Depends(get_db)):
         )
 
     if payload.role and user.role != payload.role:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="当前账号不属于所选登录入口")
+        # 管理员入口同时接受 admin 和 super_admin
+        if not (payload.role == "admin" and user.role == "super_admin"):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="当前账号不属于所选登录入口")
 
     if not verify_password(payload.password, user.password_hash):
         user.failed_attempts = (user.failed_attempts or 0) + 1

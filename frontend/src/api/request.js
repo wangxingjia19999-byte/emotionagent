@@ -37,7 +37,18 @@ request.interceptors.response.use(
   },
   async (error) => {
     const status = error.response?.status
-    const message = error.response?.data?.detail || error.message || '网络错误'
+    // 优先显示后端返回的 detail 或 message 字段
+    let message = error.response?.data?.detail || error.response?.data?.message
+    if (!message) {
+      if (status === 404) message = '请求的资源不存在'
+      else if (status === 401) message = '身份验证失败'
+      else if (status === 403) message = '没有访问权限'
+      else if (status === 422) message = '请求参数有误'
+      else if (status === 423) message = '账户已被锁定'
+      else if (status >= 500) message = '服务器内部错误，请稍后重试'
+      else if (error.code === 'ERR_NETWORK') message = '无法连接服务器，请检查网络或后端是否启动'
+      else message = error.message || '请求失败'
+    }
 
     // 401 → 尝试 refresh token
     if (status === 401 && !error.config._retry) {
