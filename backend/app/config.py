@@ -39,6 +39,13 @@ class Settings(BaseSettings):
     openai_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
     openai_model_name: str = "qwen-plus"
 
+    # SMTP 邮件
+    smtp_host: str = "smtp.qq.com"
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = ""
+
     # CORS
     cors_origins: list[str] = ["http://localhost:5173"]
 

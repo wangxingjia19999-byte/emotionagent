@@ -47,7 +47,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { Calendar, ChatDotRound, Collection, MagicStick, User, UserFilled } from '@element-plus/icons-vue'
+import { Calendar, ChatDotRound, Collection, MagicStick, ShoppingCart, User, UserFilled } from '@element-plus/icons-vue'
 
 defineEmits(['navigate', 'logout'])
 
@@ -62,6 +62,7 @@ const navigationItems = [
   { label: '每日打卡', description: '关照自己的情绪状态', route: '/daily-check', theme: 'check', icon: Calendar },
   { label: '好友聊天', description: '去和熟悉的人聊聊', route: '/friends', theme: 'friends', icon: UserFilled },
   { label: '社区广场', description: '分享和查看心情', route: '/community', theme: 'community', icon: Collection },
+  { label: '解压商城', description: '挑一件解压好物给自己', route: '/shop', theme: 'shop', icon: ShoppingCart },
   { label: '个人中心', description: '资料与账号管理', route: '/profile', theme: 'profile', icon: User }
 ]
 
@@ -158,6 +159,7 @@ const isActive = (route) => props.activeRoute === route || props.activeRoute.sta
 .app-sidebar__item-icon--check { color: #f0b35b; background: #fff7ed; }
 .app-sidebar__item-icon--friends { color: #5f87ff; background: #edf3ff; }
 .app-sidebar__item-icon--community { color: #43a78d; background: #edf9f5; }
+.app-sidebar__item-icon--shop { color: #e88b5e; background: #fef5f0; }
 .app-sidebar__item-icon--profile { color: #6f7c90; background: #f2f5fa; }
 
 .app-sidebar__item-copy {

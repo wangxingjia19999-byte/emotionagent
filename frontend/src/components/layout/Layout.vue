@@ -52,6 +52,7 @@ const pageKey = computed(() => {
   if (route.path.startsWith('/friends')) return 'friends'
   if (route.path.startsWith('/community') || route.path.startsWith('/publish-post')) return 'community'
   if (route.path.startsWith('/profile')) return 'profile'
+  if (route.path.startsWith('/shop')) return 'shop'
   return 'home'
 })
 
@@ -61,7 +62,8 @@ const pageMeta = computed(() => {
     'ai-chat': { tag: 'AI 情绪陪伴', title: 'AI 情绪陪伴', subtitle: '把想说的话慢慢说出来，先被看见再去处理。' },
     friends: { tag: '好友聊天', title: '好友聊天', subtitle: '和熟悉的人聊聊，也许会轻松一点。' },
     community: { tag: '社区广场', title: '社区广场', subtitle: '看看别人的故事，也分享自己的片刻心情。' },
-    profile: { tag: '个人中心', title: '个人中心', subtitle: '管理你的资料与账号安全，让它更像你自己。' }
+    profile: { tag: '个人中心', title: '个人中心', subtitle: '管理你的资料与账号安全，让它更像你自己。' },
+    shop: { tag: '解压商城', title: '解压商城', subtitle: '挑一件喜欢的小物，给紧绷的生活一个温柔的拥抱。' }
   }
   return map[pageKey.value]
 })

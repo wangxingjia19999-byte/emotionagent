@@ -15,6 +15,10 @@ const PublishPost = () => import('../views/PublishPost.vue')
 const Admin = () => import('../views/Admin.vue')
 const AgentConfig = () => import('../views/AgentConfig.vue')
 const DailyCheck = () => import('../views/DailyCheck.vue')
+const Shop = () => import('../views/Shop.vue')
+const ShopProduct = () => import('../views/ShopProduct.vue')
+const ShopCart = () => import('../views/ShopCart.vue')
+const ShopOrders = () => import('../views/ShopOrders.vue')
 
 const router = createRouter({
   history: createWebHistory(),
@@ -37,7 +41,11 @@ const router = createRouter({
         { path: 'publish-post', component: PublishPost },
         { path: 'admin', component: Admin },
         { path: 'agent-config', component: AgentConfig },
-        { path: 'daily-check', component: DailyCheck }
+        { path: 'daily-check', component: DailyCheck },
+        { path: 'shop', component: Shop },
+        { path: 'shop/:id', component: ShopProduct, props: true },
+        { path: 'shop/cart', component: ShopCart },
+        { path: 'shop/orders', component: ShopOrders }
       ]
     }
   ]

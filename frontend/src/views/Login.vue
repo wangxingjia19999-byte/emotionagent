@@ -68,8 +68,8 @@
           </div>
 
           <el-form ref="formRef" :model="form" :rules="rules" class="auth-form" @submit.prevent>
-            <el-form-item prop="username" class="stagger-item" style="animation-delay: 0.08s;">
-              <el-input v-model="form.username" size="large" placeholder="用户名" clearable />
+            <el-form-item prop="account" class="stagger-item" style="animation-delay: 0.08s;">
+              <el-input v-model="form.account" size="large" placeholder="邮箱 / 系统账号" clearable />
             </el-form-item>
 
             <el-form-item prop="password" class="stagger-item" style="animation-delay: 0.16s;">
@@ -108,12 +108,12 @@ const loginModes = [
 ]
 
 const form = reactive({
-  username: '',
+  account: '',
   password: ''
 })
 
 const rules = {
-  username: [{ required: true, message: '用户名不能为空', trigger: 'blur' }],
+  account: [{ required: true, message: '请输入邮箱或系统账号', trigger: 'blur' }],
   password: [
     { required: true, message: '密码不能为空', trigger: 'blur' },
     { min: 6, message: '密码长度不能少于6位', trigger: 'blur' }
@@ -126,7 +126,7 @@ const onLogin = () => {
     loading.value = true
     try {
       const res = await login({
-        username: form.username,
+        account: form.account,
         password: form.password,
         role: currentRole.value
       })

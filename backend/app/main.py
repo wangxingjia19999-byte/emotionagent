@@ -35,9 +35,11 @@ import app.models.questionnaire as _questionnaire_model  # noqa: F401
 import app.models.user as _user_model  # noqa: F401
 import app.models.crisis_alert as _crisis_model  # noqa: F401
 import app.models.emotion_log as _emotion_log_model  # noqa: F401
+import app.models.shop as _shop_model  # noqa: F401
 import app.models.user_profile as _profile_model  # noqa: F401
+import app.models.verification_code as _vc_model  # noqa: F401
 
-from app.routers import agent, auth, friends, home, mcp, posts, private_message, questionnaire, user
+from app.routers import agent, auth, friends, home, mcp, posts, private_message, questionnaire, shop, user
 
 # ── 限流器 ──────────────────────────────────────────────────
 limiter = Limiter(key_func=get_remote_address, default_limits=["60/minute"])
@@ -128,4 +130,5 @@ app.include_router(agent.router, prefix="/api")
 app.include_router(mcp.router, prefix="/api")
 app.include_router(posts.router, prefix="/api")
 app.include_router(questionnaire.router, prefix="/api")
+app.include_router(shop.router, prefix="/api")
 app.include_router(user.router, prefix="/api")

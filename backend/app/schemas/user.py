@@ -15,19 +15,25 @@ def _validate_password_strength(value: str) -> str:
     return value
 
 
-class UserRegister(BaseModel):
-    username: str = Field(min_length=1)
+class SendVerifyCodeRequest(BaseModel):
     email: str
-    password: str = Field(min_length=6)
-    nickname: Optional[str] = None
 
-    @field_validator("username")
+    @field_validator("email")
     @classmethod
-    def validate_username(cls, value: str) -> str:
+    def validate_email(cls, value: str) -> str:
         value = value.strip()
         if not value:
-            raise ValueError("用户名不能为空")
+            raise ValueError("邮箱不能为空")
+        if "@" not in value or "." not in value:
+            raise ValueError("邮箱格式不正确")
         return value
+
+
+class UserRegister(BaseModel):
+    email: str
+    verification_code: str = Field(min_length=6, max_length=6)
+    password: str = Field(min_length=6)
+    nickname: Optional[str] = None
 
     @field_validator("email")
     @classmethod
@@ -46,7 +52,7 @@ class UserRegister(BaseModel):
 
 
 class UserLogin(BaseModel):
-    username: str
+    account: str = Field(min_length=1, description="邮箱或系统账号")
     password: str = Field(min_length=6)
     role: Optional[str] = None
 
