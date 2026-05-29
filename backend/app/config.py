@@ -1,3 +1,5 @@
+from urllib.parse import quote_plus
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -22,8 +24,9 @@ class Settings(BaseSettings):
 
     @property
     def database_url(self) -> str:
+        password = quote_plus(self.mysql_password)
         return (
-            f"mysql+pymysql://{self.mysql_user}:{self.mysql_password}"
+            f"mysql+pymysql://{self.mysql_user}:{password}"
             f"@{self.mysql_host}:{self.mysql_port}/{self.mysql_database}"
             f"?charset=utf8mb4"
         )
@@ -31,8 +34,8 @@ class Settings(BaseSettings):
     # JWT
     jwt_secret_key: str = "change-me-in-production"
     jwt_algorithm: str = "HS256"
-    jwt_access_expire_minutes: int = 15  # access token 短期
-    jwt_refresh_expire_days: int = 7  # refresh token 长期
+    jwt_access_expire_minutes: int = 15
+    jwt_refresh_expire_days: int = 7
 
     # AI / LLM
     openai_api_key: str = ""

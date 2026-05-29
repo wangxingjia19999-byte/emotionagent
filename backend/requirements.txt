@@ -4,17 +4,35 @@ SQLAlchemy==2.0.34
 PyMySQL==1.1.1
 python-dotenv==1.0.1
 python-multipart==0.0.9
+alembic==1.13.2
+
+# 用户认证与密码加密
+
 passlib[bcrypt]==1.7.4
-bcrypt==3.2.2
+bcrypt==4.1.3
 python-jose[cryptography]==3.3.0
+
+# 数据校验
+
 pydantic==2.9.2
-# MCP (Model Context Protocol) 集成
+pydantic-settings==2.5.2
+
+# 接口限流
+
+slowapi==0.1.9
+
+# MCP（Model Context Protocol）集成
+
 mcp>=1.0.0
 langchain-mcp-adapters>=0.1.0
-# LangChain 相关 (Agent 已有依赖)
+
+# LangChain / Agent 相关依赖
+
 langchain>=0.3.0
 langchain-core>=0.3.0
 langchain-openai>=0.2.0
 langchain-chroma>=0.2.0
 langchain-huggingface>=0.1.0
 langgraph>=0.2.0
+chromadb==0.5.5
+sentence-transformers==3.0.1

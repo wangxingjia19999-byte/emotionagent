@@ -18,6 +18,8 @@ CREATE TABLE IF NOT EXISTS users (
     gender VARCHAR(20),
     role VARCHAR(20) NOT NULL DEFAULT 'user',
     status VARCHAR(20) NOT NULL DEFAULT 'active',
+    failed_attempts INT NOT NULL DEFAULT 0,
+    locked_until DATETIME,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_username (username),
@@ -37,6 +39,8 @@ INSERT INTO users (
     gender,
     role,
     status,
+    failed_attempts,
+    locked_until,
     created_at,
     updated_at
 ) VALUES
@@ -51,6 +55,8 @@ INSERT INTO users (
     NULL,
     'admin',
     'active',
+    0,
+    NULL,
     NOW(),
     NOW()
 ),
@@ -65,6 +71,8 @@ INSERT INTO users (
     NULL,
     'super_admin',
     'active',
+    0,
+    NULL,
     NOW(),
     NOW()
 );
