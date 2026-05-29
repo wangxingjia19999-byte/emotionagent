@@ -21,6 +21,16 @@ request.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
+    // 清理空值参数，防止 FastAPI 将空字符串解析为 int 时报 422
+    if (config.params) {
+      const cleaned = {}
+      for (const [key, value] of Object.entries(config.params)) {
+        if (value !== '' && value !== null && value !== undefined) {
+          cleaned[key] = value
+        }
+      }
+      config.params = cleaned
+    }
     return config
   },
   (error) => Promise.reject(error)

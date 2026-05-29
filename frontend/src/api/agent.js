@@ -10,6 +10,11 @@ export function chatWithEnhancedAgent(message, userId = null) {
   return request.post('/agent/chat/enhanced', { message, user_id: userId })
 }
 
+/** 多 Agent 对话（Supervisor 架构，含商城推荐） */
+export function chatWithMultiAgent(message, userId = null) {
+  return request.post('/agent/chat/multi', { message, user_id: userId })
+}
+
 /** 获取 Agent 可用工具列表 */
 export function getAgentTools() {
   return request.get('/agent/tools')

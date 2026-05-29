@@ -216,6 +216,21 @@ class MCPEmotionAgent:
             })
         return tools_info
 
+    # ── 多 Agent 对话（Supervisor 模式） ─────────────────
+
+    def chat_multi_agent(self, user_input: str, user_id: str | None = None) -> dict:
+        """
+        使用多 Agent Supervisor 架构进行对话。
+
+        由 Supervisor 自动路由到心语陪伴 Agent 或商城推荐 Agent，
+        同时进行危机信号预检测。
+
+        Returns:
+            {"reply": str, "agent_used": str, "crisis_detected": bool}
+        """
+        from .multi_agent import multi_agent
+        return multi_agent.chat(user_input, user_id=user_id)
+
 
 # 全局单例
 mcp_emotion_agent = MCPEmotionAgent()

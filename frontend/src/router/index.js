@@ -30,6 +30,10 @@ const AdminUsers = () => import('../views/admin/AdminUsers.vue')
 const AdminQuestionnaires = () => import('../views/admin/AdminQuestionnaires.vue')
 const AdminEmotionLogs = () => import('../views/admin/AdminEmotionLogs.vue')
 const AdminPosts = () => import('../views/admin/AdminPosts.vue')
+const AdminAdmins = () => import('../views/admin/AdminAdmins.vue')
+const AdminCrisisAlerts = () => import('../views/admin/AdminCrisisAlerts.vue')
+const AdminAuditLogs = () => import('../views/admin/AdminAuditLogs.vue')
+const AdminStats = () => import('../views/admin/AdminStats.vue')
 
 function checkAdminRole() {
   try {
@@ -82,6 +86,10 @@ const router = createRouter({
         { path: 'questionnaires', component: AdminQuestionnaires },
         { path: 'emotion-logs', component: AdminEmotionLogs },
         { path: 'posts', component: AdminPosts },
+        { path: 'admins', component: AdminAdmins },
+        { path: 'crisis-alerts', component: AdminCrisisAlerts },
+        { path: 'audit-logs', component: AdminAuditLogs },
+        { path: 'stats', component: AdminStats },
       ],
     },
   ],

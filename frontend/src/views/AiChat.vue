@@ -43,7 +43,26 @@
               </span>
             </div>
             <div class="chat-bubble__content">
-              <div class="chat-bubble__text" v-text="msg.content"></div>
+              <div class="chat-bubble__text">{{ msg.content }}</div>
+
+              <!-- 商品推荐卡片 -->
+              <div v-if="msg.products && msg.products.length" class="product-cards">
+                <div
+                  v-for="p in msg.products"
+                  :key="p.index"
+                  class="product-mini-card"
+                  @click="$router.push('/shop')"
+                >
+                  <div class="product-mini-card__tag">{{ p.category }}</div>
+                  <div class="product-mini-card__name">{{ p.name }}</div>
+                  <div class="product-mini-card__price">
+                    <strong>¥{{ p.price.toFixed(2) }}</strong>
+                    <del v-if="p.originalPrice">¥{{ p.originalPrice.toFixed(2) }}</del>
+                  </div>
+                  <div class="product-mini-card__action">去商城看看 →</div>
+                </div>
+              </div>
+
               <div class="chat-bubble__time">{{ msg.time }}</div>
             </div>
           </div>
@@ -126,10 +145,12 @@
 
 <script setup>
 import { ref, nextTick, onMounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { ChatDotRound, MagicStick, Promotion, Setting, Sunny } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { chatWithEnhancedAgent, getAgentTools } from '@/api/agent'
+import { chatWithMultiAgent, getAgentTools } from '@/api/agent'
 
+const router = useRouter()
 const inputText = ref('')
 const messages = ref([])
 const thinking = ref(false)
@@ -140,7 +161,8 @@ const quickPrompts = [
   '今天心情不太好，能陪我聊聊吗？',
   '最近压力很大，不知道怎么缓解',
   '我总是控制不住地焦虑，怎么办？',
-  '怎么才能更好地接纳自己的情绪？'
+  '怎么才能更好地接纳自己的情绪？',
+  '最近心情有点低落，有什么可以让我开心的东西推荐吗？'
 ]
 
 const tips = [
@@ -150,6 +172,44 @@ const tips = [
   '适当的运动能改善情绪状态',
   '和朋友倾诉可以减轻心理负担'
 ]
+
+// ── 解析 AI 回复中的商品信息 ──
+function parseProducts(text) {
+  const products = []
+  // 匹配模式: [数字]. [分类名] 商品名\n     价格: ¥XX.XX (原价 ¥XX.XX)
+  const regex = /\s*(\d+)\.\s*\[([^\]]+)\]\s*([^\n]+)\n\s*价格:\s*¥([\d.]+)\s*(?:\(原价\s*¥([\d.]+)\))?/g
+  let match
+  while ((match = regex.exec(text)) !== null) {
+    products.push({
+      index: match[1],
+      category: match[2],
+      name: match[3].trim(),
+      price: parseFloat(match[4]),
+      originalPrice: match[5] ? parseFloat(match[5]) : null,
+    })
+  }
+  return products
+}
+
+// ── 去除 AI 回复中的商品信息，避免重复展示 ──
+function cleanProductText(text, products) {
+  if (!products.length) return text
+  let cleaned = text
+  // 移除推荐块标题行及后续商品列表
+  cleaned = cleaned.replace(/【为你推荐以下.*?】[\s\S]*$/, '')
+  cleaned = cleaned.replace(/={3,}[\s\S]*$/, '')
+  // 如果清空后太短，返回原文前部分
+  if (cleaned.trim().length < 20) {
+    const lines = text.split('\n')
+    const usefulLines = []
+    for (const line of lines) {
+      if (/\s*\d+\.\s*\[/.test(line)) break
+      usefulLines.push(line)
+    }
+    cleaned = usefulLines.join('\n').trim()
+  }
+  return cleaned
+}
 
 const userAvatar = computed(() => {
   try {
@@ -193,9 +253,25 @@ async function sendMessage(text) {
       userId = String(u.id || '')
     } catch { /* ignore */ }
 
-    const res = await chatWithEnhancedAgent(content, userId)
-    const reply = res.data?.data?.reply || res.data?.reply || '抱歉，我暂时无法回复，请稍后再试。'
-    messages.value.push({ role: 'assistant', content: reply, time: getTime() })
+    // 使用多 Agent 端点，自动路由到情绪陪伴或商城推荐
+    const res = await chatWithMultiAgent(content, userId)
+    const data = res.data?.data || res.data || {}
+    const reply = data.reply || '抱歉，我暂时无法回复，请稍后再试。'
+    const agentUsed = data.agent_used || 'emotion_companion'
+    const crisisDetected = data.crisis_detected || false
+
+    // 解析商品推荐
+    const products = parseProducts(reply)
+    const displayText = products.length ? cleanProductText(reply, products) : reply
+
+    messages.value.push({
+      role: 'assistant',
+      content: displayText,
+      time: getTime(),
+      agentUsed,
+      crisisDetected,
+      products,  // 解析出的商品列表
+    })
   } catch (e) {
     const errMsg = e.response?.data?.detail || e.message || '请求失败'
     ElMessage.error(errMsg)
@@ -573,5 +649,65 @@ onMounted(async () => {
 .tip-item .el-icon {
   color: #f0b35b;
   flex: none;
+}
+
+/* ── 商品推荐卡片 ── */
+.product-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.product-mini-card {
+  background: #fff;
+  border: 1px solid #e8e4f6;
+  border-radius: 14px;
+  padding: 12px 16px;
+  width: 200px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.product-mini-card:hover {
+  border-color: #7c6ff6;
+  box-shadow: 0 4px 16px rgba(124, 111, 246, 0.12);
+  transform: translateY(-2px);
+}
+
+.product-mini-card__tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-size: 11px;
+  background: #f0edff;
+  color: #7c6ff6;
+  margin-bottom: 6px;
+}
+
+.product-mini-card__name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #2f3142;
+  margin-bottom: 4px;
+  line-height: 1.4;
+}
+
+.product-mini-card__price {
+  font-size: 13px;
+  color: #e8654a;
+  margin-bottom: 6px;
+}
+
+.product-mini-card__price del {
+  font-size: 11px;
+  color: #c0c6d4;
+  margin-left: 4px;
+}
+
+.product-mini-card__action {
+  font-size: 12px;
+  color: #7c6ff6;
+  font-weight: 500;
 }
 </style>

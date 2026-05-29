@@ -2,6 +2,7 @@
 管理员独立认证系统
 管理员账号存储在 admins 表中，与 users 表完全隔离
 """
+import asyncio
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -11,7 +12,10 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.admin import Admin
-from app.utils.jwt import create_access_token, create_refresh_token, decode_token
+from app.utils.jwt import (
+    add_token_to_blacklist, create_access_token, create_refresh_token,
+    decode_token, get_current_admin,
+)
 from app.utils.security import hash_password, verify_password
 
 router = APIRouter(prefix="/auth/admin", tags=["管理员认证"])
@@ -143,3 +147,41 @@ def admin_refresh_token(request: Request, body: dict, db: Session = Depends(get_
             "refresh_token": new_refresh,
         },
     }
+
+
+@router.post("/logout")
+async def admin_logout(
+    request: Request,
+    admin: Admin = Depends(get_current_admin),
+):
+    """管理员登出，将当前 token 加入黑名单"""
+    auth_header = request.headers.get("Authorization", "")
+    token = auth_header.replace("Bearer ", "") if auth_header.startswith("Bearer ") else ""
+    if token:
+        await add_token_to_blacklist(token)
+    return {"code": 0, "message": "已登出", "data": None}
+
+
+@router.post("/change-password")
+def admin_change_password(
+    body: dict,
+    admin: Admin = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    """管理员修改自己的密码"""
+    old_password = body.get("old_password", "")
+    new_password = body.get("new_password", "")
+
+    if not old_password or not new_password:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="请提供旧密码和新密码")
+    if len(new_password) < 8:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="新密码长度不能少于8位")
+
+    if not verify_password(old_password, admin.password_hash):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="旧密码错误")
+
+    admin.password_hash = hash_password(new_password)
+    db.add(admin)
+    db.commit()
+
+    return {"code": 0, "message": "密码已修改", "data": None}
