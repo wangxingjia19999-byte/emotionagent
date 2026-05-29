@@ -320,6 +320,62 @@ source venv/bin/activate  # macOS/Linux
 2. **热更新**：Vite 会自动刷新浏览器
 3. **API 调试**：使用浏览器开发者工具调试
 
+## 📦 Redis 缓存
+
+项目使用 Redis 提供缓存、Token 黑名单和消息队列支持。
+
+### 安装 Redis
+
+```bash
+# macOS
+brew install redis && brew services start redis
+
+# Ubuntu/Debian
+sudo apt install redis-server && sudo systemctl start redis
+
+# Docker
+docker run -d --name redis -p 6379:6379 redis:7-alpine
+```
+
+### .env 配置
+
+```env
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=
+REDIS_DB=0
+```
+
+**Redis 提供的功能：**
+- **API 缓存** — `@cache_result(ttl=60)` 装饰器缓存接口结果
+- **Token 黑名单** — 退出登录后将 token 加入黑名单，即时失效
+- **限流存储** — 多进程共享限流计数（生产环境推荐切换）
+
+## 📬 消息队列 (arq)
+
+使用 arq（基于 Redis 的异步任务队列）处理后台任务。
+
+### 启动 Worker
+
+```bash
+# 使用启动脚本
+./start_worker.sh
+
+# 或手动启动
+cd backend
+python -m arq backend.app.worker.WorkerSettings
+```
+
+**后台任务列表：**
+| 任务 | 说明 |
+|------|------|
+| `send_verification_email_task` | 异步发送验证码邮件 |
+| `send_notification_email_task` | 异步发送通知邮件 |
+| `save_emotion_log_task` | 异步保存情绪记录 |
+| `send_email_task` | 通用异步邮件发送 |
+
+**注意：** 如果未启动 Worker，邮件会回退到同步发送。
+
 ## 🗄️ 数据库初始化
 
 如果需要从零开始初始化数据库：
@@ -355,6 +411,8 @@ alembic upgrade head
 - LangChain 0.3.0+
 - MCP 1.0.0+
 - FastMCP 3.0.0+
+- Redis 5.0.0+
+- arq 0.26.0+
 
 ### 前端主要依赖
 - Vue 3.5.10
