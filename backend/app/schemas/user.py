@@ -1,21 +1,39 @@
+import re
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
-class UserRegister(BaseModel):
-    username: str = Field(min_length=1)
-    email: str
-    password: str = Field(min_length=6)
-    nickname: Optional[str] = None
+def _validate_password_strength(value: str) -> str:
+    """密码强度：至少8位，必须包含字母和数字"""
+    if len(value) < 8:
+        raise ValueError("密码长度不能少于8位")
+    if not re.search(r"[a-zA-Z]", value):
+        raise ValueError("密码必须包含至少一个字母")
+    if not re.search(r"\d", value):
+        raise ValueError("密码必须包含至少一个数字")
+    return value
 
-    @field_validator("username")
+
+class SendVerifyCodeRequest(BaseModel):
+    email: str
+
+    @field_validator("email")
     @classmethod
-    def validate_username(cls, value: str) -> str:
+    def validate_email(cls, value: str) -> str:
         value = value.strip()
         if not value:
-            raise ValueError("用户名不能为空")
+            raise ValueError("邮箱不能为空")
+        if "@" not in value or "." not in value:
+            raise ValueError("邮箱格式不正确")
         return value
+
+
+class UserRegister(BaseModel):
+    email: str
+    verification_code: str = Field(min_length=6, max_length=6)
+    password: str = Field(min_length=6)
+    nickname: Optional[str] = None
 
     @field_validator("email")
     @classmethod
@@ -30,13 +48,11 @@ class UserRegister(BaseModel):
     @field_validator("password")
     @classmethod
     def validate_password(cls, value: str) -> str:
-        if len(value) < 6:
-            raise ValueError("密码长度不能少于6位")
-        return value
+        return _validate_password_strength(value)
 
 
 class UserLogin(BaseModel):
-    username: str
+    account: str = Field(min_length=1, description="邮箱或系统账号")
     password: str = Field(min_length=6)
     role: Optional[str] = None
 
@@ -85,11 +101,16 @@ class PasswordChange(BaseModel):
     new_password: str = Field(min_length=6)
     confirm_password: str = Field(min_length=6)
 
+    @field_validator("new_password")
+    @classmethod
+    def validate_new_password_strength(cls, value: str) -> str:
+        return _validate_password_strength(value)
+
     @field_validator("confirm_password")
     @classmethod
     def validate_confirm_password(cls, value: str) -> str:
-        if len(value) < 6:
-            raise ValueError("密码长度不能少于6位")
+        if len(value) < 8:
+            raise ValueError("密码长度不能少于8位")
         return value
 
 
@@ -108,5 +129,10 @@ class UserResponse(BaseModel):
 
 
 class LoginResponseData(BaseModel):
-    token: str
+    access_token: str
+    refresh_token: str
     user: UserResponse
+
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str

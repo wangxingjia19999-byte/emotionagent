@@ -446,7 +446,8 @@ const openLogoutDialog = () => {
 }
 
 const confirmLogout = () => {
-  localStorage.removeItem('token')
+  localStorage.removeItem('access_token')
+  localStorage.removeItem('refresh_token')
   localStorage.removeItem('user')
   router.replace('/login')
 }

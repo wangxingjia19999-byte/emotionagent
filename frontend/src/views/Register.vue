@@ -20,26 +20,15 @@
         <div class="hero-highlights hero-highlights--register">
           <article class="highlight-card stagger-item" style="animation-delay: 0.16s;">
             <span class="highlight-icon highlight-icon--mint"></span>
-            <div>
-              <h3>安全倾诉</h3>
-              <p>在安心的氛围里，慢慢把想说的话讲出来。</p>
-            </div>
+            <div><h3>安全倾诉</h3><p>在安心的氛围里，慢慢把想说的话讲出来。</p></div>
           </article>
-
           <article class="highlight-card stagger-item" style="animation-delay: 0.24s;">
             <span class="highlight-icon highlight-icon--blue"></span>
-            <div>
-              <h3>温柔记录</h3>
-              <p>把日常情绪留在时间里，也留给未来的自己。</p>
-            </div>
+            <div><h3>温柔记录</h3><p>把日常情绪留在时间里，也留给未来的自己。</p></div>
           </article>
-
           <article class="highlight-card stagger-item" style="animation-delay: 0.32s;">
             <span class="highlight-icon highlight-icon--pink"></span>
-            <div>
-              <h3>轻松开始</h3>
-              <p>只需几步，就能拥有属于你的陪伴空间。</p>
-            </div>
+            <div><h3>轻松开始</h3><p>只需几步，就能拥有属于你的陪伴空间。</p></div>
           </article>
         </div>
 
@@ -51,24 +40,35 @@
           <div class="auth-card__header">
             <span class="section-badge">注册</span>
             <h2>创建账号</h2>
-            <p>加入心语陪伴，给情绪一个安放的地方</p>
+            <p>系统将自动为你分配账号，注册后可在个人中心查看</p>
           </div>
 
           <el-form ref="formRef" :model="form" :rules="rules" class="auth-form" @submit.prevent>
-            <el-form-item prop="username" class="stagger-item" style="animation-delay: 0.06s;">
-              <el-input v-model="form.username" size="large" placeholder="用户名" clearable />
+            <el-form-item prop="email" class="stagger-item" style="animation-delay: 0.06s;">
+              <el-input v-model="form.email" size="large" placeholder="请输入邮箱" clearable />
             </el-form-item>
 
-            <el-form-item prop="email" class="stagger-item" style="animation-delay: 0.12s;">
-              <el-input v-model="form.email" size="large" placeholder="邮箱" clearable />
+            <el-form-item prop="verification_code" class="stagger-item" style="animation-delay: 0.12s;">
+              <div class="verify-row">
+                <el-input v-model="form.verification_code" size="large" placeholder="验证码" maxlength="6" />
+                <el-button
+                  class="verify-btn"
+                  size="large"
+                  :disabled="countdown > 0"
+                  :loading="sending"
+                  @click="handleSendCode"
+                >
+                  {{ countdown > 0 ? `${countdown}s 后重发` : '发送验证码' }}
+                </el-button>
+              </div>
             </el-form-item>
 
             <el-form-item prop="nickname" class="stagger-item" style="animation-delay: 0.18s;">
-              <el-input v-model="form.nickname" size="large" placeholder="昵称" clearable />
+              <el-input v-model="form.nickname" size="large" placeholder="昵称（选填）" clearable />
             </el-form-item>
 
             <el-form-item prop="password" class="stagger-item" style="animation-delay: 0.24s;">
-              <el-input v-model="form.password" size="large" type="password" show-password placeholder="密码" />
+              <el-input v-model="form.password" size="large" type="password" show-password placeholder="密码（至少8位，含字母和数字）" />
             </el-form-item>
 
             <el-form-item prop="confirmPassword" class="stagger-item" style="animation-delay: 0.3s;">
@@ -86,6 +86,17 @@
         </div>
       </section>
     </section>
+
+    <!-- 注册成功弹窗 -->
+    <el-dialog v-model="showResult" title="注册成功" width="420px" :lock-scroll="true" :close-on-click-modal="false">
+      <div class="result-body">
+        <p>请妥善保存你的系统账号，可用于登录：</p>
+        <div class="result-account">{{ generatedAccount }}</div>
+      </div>
+      <template #footer>
+        <el-button class="checkout-submit" @click="$router.push('/login')">去登录</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -93,54 +104,70 @@
 import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { register } from '../api/auth'
+import { register, sendVerifyCode } from '../api/auth'
 
 const router = useRouter()
 const formRef = ref()
 const loading = ref(false)
+const sending = ref(false)
+const countdown = ref(0)
+const showResult = ref(false)
+const generatedAccount = ref('')
 
 const form = reactive({
-  username: '',
   email: '',
+  verification_code: '',
   nickname: '',
   password: '',
   confirmPassword: ''
 })
 
+let countdownTimer = null
+
 const validateEmail = (_, value, callback) => {
-  if (!value) {
-    callback(new Error('邮箱不能为空'))
-    return
-  }
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-  if (!emailRegex.test(value)) {
-    callback(new Error('邮箱格式必须正确'))
-    return
-  }
+  if (!value) { callback(new Error('邮箱不能为空')); return }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) { callback(new Error('邮箱格式不正确')); return }
   callback()
 }
 
 const validateConfirmPassword = (_, value, callback) => {
-  if (!value) {
-    callback(new Error('确认密码不能为空'))
-    return
-  }
-  if (value !== form.password) {
-    callback(new Error('确认密码必须和密码一致'))
-    return
-  }
+  if (!value) { callback(new Error('确认密码不能为空')); return }
+  if (value !== form.password) { callback(new Error('两次密码不一致')); return }
   callback()
 }
 
 const rules = {
-  username: [{ required: true, message: '用户名不能为空', trigger: 'blur' }],
   email: [{ validator: validateEmail, trigger: 'blur' }],
+  verification_code: [
+    { required: true, message: '验证码不能为空', trigger: 'blur' },
+    { len: 6, message: '验证码为6位数字', trigger: 'blur' }
+  ],
   nickname: [],
   password: [
     { required: true, message: '密码不能为空', trigger: 'blur' },
-    { min: 6, message: '密码长度不能少于6位', trigger: 'blur' }
+    { min: 8, message: '密码长度不能少于8位', trigger: 'blur' },
+    { pattern: /[a-zA-Z]/, message: '密码必须包含至少一个字母', trigger: 'blur' },
+    { pattern: /\d/, message: '密码必须包含至少一个数字', trigger: 'blur' }
   ],
   confirmPassword: [{ validator: validateConfirmPassword, trigger: 'blur' }]
+}
+
+async function handleSendCode() {
+  if (!form.email) { ElMessage.warning('请先输入邮箱'); return }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) { ElMessage.warning('邮箱格式不正确'); return }
+
+  sending.value = true
+  try {
+    await sendVerifyCode({ email: form.email })
+    ElMessage.success('验证码已发送，请查收邮件')
+    countdown.value = 60
+    countdownTimer = setInterval(() => {
+      countdown.value--
+      if (countdown.value <= 0) clearInterval(countdownTimer)
+    }, 1000)
+  } finally {
+    sending.value = false
+  }
 }
 
 const onRegister = () => {
@@ -148,14 +175,14 @@ const onRegister = () => {
     if (!valid) return
     loading.value = true
     try {
-      await register({
-        username: form.username,
+      const res = await register({
         email: form.email,
+        verification_code: form.verification_code,
         password: form.password,
         nickname: form.nickname
       })
-      ElMessage.success('注册成功，请登录')
-      router.push('/login')
+      generatedAccount.value = res.data.username
+      showResult.value = true
     } finally {
       loading.value = false
     }
@@ -195,6 +222,7 @@ const onRegister = () => {
   background: linear-gradient(150deg, rgba(247, 249, 255, 0.92), rgba(238, 243, 255, 0.88) 54%, rgba(255, 246, 250, 0.82));
   backdrop-filter: blur(18px);
   border: 1px solid rgba(255, 255, 255, 0.72);
+  position: relative;
 }
 
 .auth-hero::after {
@@ -207,10 +235,7 @@ const onRegister = () => {
   pointer-events: none;
 }
 
-.auth-hero > * {
-  position: relative;
-  z-index: 1;
-}
+.auth-hero > * { position: relative; z-index: 1; }
 
 .brand-mark {
   display: inline-flex;
@@ -222,17 +247,12 @@ const onRegister = () => {
 }
 
 .brand-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 999px;
+  width: 12px; height: 12px; border-radius: 999px;
   background: linear-gradient(135deg, var(--primary), var(--secondary));
   box-shadow: 0 0 20px rgba(124, 111, 246, 0.35);
 }
 
-.hero-copy {
-  max-width: 560px;
-  margin-top: 20px;
-}
+.hero-copy { max-width: 560px; margin-top: 20px; }
 
 .eyebrow-pill {
   display: inline-flex;
@@ -263,11 +283,7 @@ const onRegister = () => {
   color: var(--text-secondary);
 }
 
-.hero-highlights {
-  display: grid;
-  gap: 14px;
-  max-width: 420px;
-}
+.hero-highlights { display: grid; gap: 14px; max-width: 420px; }
 
 .highlight-card {
   display: flex;
@@ -287,44 +303,19 @@ const onRegister = () => {
   box-shadow: 0 16px 30px rgba(124, 111, 246, 0.08);
 }
 
-.highlight-card h3 {
-  margin: 0 0 4px;
-  font-size: 15px;
-  color: var(--text-primary);
-}
-
-.highlight-card p {
-  margin: 0;
-  font-size: 13px;
-  color: var(--text-secondary);
-  line-height: 1.7;
-}
+.highlight-card h3 { margin: 0 0 4px; font-size: 15px; color: var(--text-primary); }
+.highlight-card p { margin: 0; font-size: 13px; color: var(--text-secondary); line-height: 1.7; }
 
 .highlight-icon {
-  width: 42px;
-  height: 42px;
-  border-radius: 16px;
-  flex: 0 0 42px;
+  width: 42px; height: 42px; border-radius: 16px; flex: 0 0 42px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
 }
 
-.highlight-icon--mint {
-  background: linear-gradient(135deg, rgba(168, 230, 207, 0.22), rgba(196, 240, 224, 0.34));
-}
+.highlight-icon--mint { background: linear-gradient(135deg, rgba(168, 230, 207, 0.22), rgba(196, 240, 224, 0.34)); }
+.highlight-icon--blue { background: linear-gradient(135deg, rgba(108, 140, 255, 0.18), rgba(184, 198, 255, 0.32)); }
+.highlight-icon--pink { background: linear-gradient(135deg, rgba(255, 184, 210, 0.22), rgba(255, 210, 230, 0.34)); }
 
-.highlight-icon--blue {
-  background: linear-gradient(135deg, rgba(108, 140, 255, 0.18), rgba(184, 198, 255, 0.32));
-}
-
-.highlight-icon--pink {
-  background: linear-gradient(135deg, rgba(255, 184, 210, 0.22), rgba(255, 210, 230, 0.34));
-}
-
-.hero-footnote {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: 14px;
-}
+.hero-footnote { margin: 0; color: var(--text-secondary); font-size: 14px; }
 
 .auth-panel {
   display: flex;
@@ -351,19 +342,8 @@ const onRegister = () => {
   border-color: rgba(124, 111, 246, 0.12);
 }
 
-.auth-card__header h2 {
-  margin: 12px 0 6px;
-  font-size: 30px;
-  line-height: 1.15;
-  color: var(--text-primary);
-}
-
-.auth-card__header p {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: 14px;
-  line-height: 1.8;
-}
+.auth-card__header h2 { margin: 12px 0 6px; font-size: 30px; line-height: 1.15; color: var(--text-primary); }
+.auth-card__header p { margin: 0; color: var(--text-secondary); font-size: 14px; line-height: 1.8; }
 
 .section-badge {
   display: inline-flex;
@@ -377,42 +357,24 @@ const onRegister = () => {
   letter-spacing: 0.06em;
 }
 
-.auth-form {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
+.auth-form { display: flex; flex-direction: column; gap: 14px; }
+
+.verify-row { display: flex; gap: 10px; width: 100%; }
+.verify-row .el-input { flex: 1; }
+
+.verify-btn {
+  flex-shrink: 0;
+  min-width: 120px;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid #d8e1ff;
+  background: #edf2ff;
+  color: #6074df;
+  font-size: 13px;
 }
 
-.auth-form :deep(.el-form-item) {
-  animation: staggerItem 0.62s var(--ease-out) both;
-}
-
-.auth-form :deep(.el-form-item:nth-child(1)) {
-  animation-delay: 0.06s;
-}
-
-.auth-form :deep(.el-form-item:nth-child(2)) {
-  animation-delay: 0.12s;
-}
-
-.auth-form :deep(.el-form-item:nth-child(3)) {
-  animation-delay: 0.18s;
-}
-
-.auth-form :deep(.el-form-item:nth-child(4)) {
-  animation-delay: 0.24s;
-}
-
-.auth-form :deep(.el-form-item:nth-child(5)) {
-  animation-delay: 0.3s;
-}
-
-.auth-link {
-  text-align: center;
-  color: var(--text-secondary);
-  font-size: 14px;
-  margin-top: 2px;
-}
+.verify-btn:hover { background: #d8e1ff; }
+.verify-btn:disabled { color: #b8bfcd; background: #f4f6fb; border-color: #e8ebf3; }
 
 .primary-btn--register {
   margin-top: 6px;
@@ -420,9 +382,9 @@ const onRegister = () => {
   animation: flowGradient 10s ease infinite;
 }
 
-.primary-btn--register:hover {
-  transform: translateY(-2px);
-}
+.primary-btn--register:hover { transform: translateY(-2px); }
+
+.auth-link { text-align: center; color: var(--text-secondary); font-size: 14px; margin-top: 2px; }
 
 .auth-link--animated a {
   position: relative;
@@ -432,65 +394,49 @@ const onRegister = () => {
 .auth-link--animated a::after {
   content: '';
   position: absolute;
-  left: 0;
-  bottom: -3px;
-  width: 100%;
-  height: 1px;
+  left: 0; bottom: -3px;
+  width: 100%; height: 1px;
   background: currentColor;
   transform: scaleX(0);
   transform-origin: left center;
   transition: transform 0.24s var(--ease-out);
 }
 
-.auth-link--animated a:hover::after {
-  transform: scaleX(1);
+.auth-link--animated a:hover::after { transform: scaleX(1); }
+
+.result-body { text-align: center; padding: 16px 0; }
+.result-body p { color: #526073; margin: 0 0 16px; }
+
+.result-account {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  color: #6074df;
+  background: #edf2ff;
+  border-radius: 14px;
+  padding: 16px 24px;
+  display: inline-block;
+}
+
+.checkout-submit {
+  border: none; color: #ffffff;
+  background: linear-gradient(135deg, #6f84e8 0%, #7a92ee 100%);
+  border-radius: 12px;
+  min-height: 40px;
 }
 
 @media (max-width: 1180px) {
-  .auth-shell {
-    grid-template-columns: 1fr;
-    min-height: auto;
-  }
-
-  .auth-hero {
-    padding-bottom: 34px;
-  }
-
-  .auth-panel {
-    padding-top: 0;
-  }
+  .auth-shell { grid-template-columns: 1fr; min-height: auto; }
+  .auth-hero { padding-bottom: 34px; }
+  .auth-panel { padding-top: 0; }
 }
 
 @media (max-width: 640px) {
-  .auth-page {
-    padding: 16px;
-  }
-
-  .auth-hero,
-  .auth-panel {
-    padding-left: 20px;
-    padding-right: 20px;
-  }
-
-  .auth-hero {
-    padding-top: 24px;
-  }
-
-  .hero-copy h1 {
-    font-size: 34px;
-  }
-
-  .auth-card {
-    padding: 28px 22px 24px;
-    width: min(100%, 460px);
-  }
-
-  .hero-highlights {
-    max-width: none;
-  }
-
-  .auth-page {
-    padding: 16px;
-  }
+  .auth-page { padding: 16px; }
+  .auth-hero, .auth-panel { padding-left: 20px; padding-right: 20px; }
+  .auth-hero { padding-top: 24px; }
+  .hero-copy h1 { font-size: 34px; }
+  .auth-card { padding: 28px 22px 24px; width: min(100%, 460px); }
+  .hero-highlights { max-width: none; }
 }
 </style>

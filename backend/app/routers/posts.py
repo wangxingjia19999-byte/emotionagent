@@ -12,7 +12,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models.post import Comment, Favorite, Post, PostLike
+from app.models.post import Comment, Favorite, Post, PostHug, PostLike
 from app.models.user import User
 from app.schemas.post import (
     CommentActionResponse,
@@ -26,6 +26,7 @@ from app.schemas.post import (
     PostPageResponse,
     PostUpdate,
 )
+from app.utils.audit import audit_log
 from app.utils.jwt import get_current_user
 
 
@@ -113,26 +114,33 @@ def _load_users_map(db: Session, user_ids: Iterable[int]) -> dict[int, User]:
     return {user.id: user for user in users}
 
 
-def _serialize_post(post: Post, author: User | None, *, liked: bool = False, favorited: bool = False) -> dict:
+def _serialize_post(post: Post, author: User | None, *, liked: bool = False, hugged: bool = False, favorited: bool = False) -> dict:
     image_urls = _normalize_image_urls(getattr(post, "image_urls", None), getattr(post, "image_url", None))
+    is_anonymous = bool(getattr(post, "is_anonymous", False))
     payload = {
         "id": post.id,
-        "user_id": post.user_id,
+        "user_id": post.user_id if not is_anonymous else 0,
         "title": post.title,
         "content": post.content,
         "category": post.category or "其他",
+        "mood_tag": getattr(post, "mood_tag", None) or None,
+        "is_anonymous": is_anonymous,
         "image_url": image_urls[0] if image_urls else _normalize_image_url(post.image_url),
         "image_urls": image_urls,
         "view_count": int(post.view_count or 0),
         "like_count": int(post.like_count or 0),
+        "hug_count": int(post.hug_count or 0),
         "comment_count": int(post.comment_count or 0),
         "favorite_count": int(post.favorite_count or 0),
         "created_at": post.created_at,
         "updated_at": post.updated_at,
-        "author": _serialize_user(author),
+        "author": _serialize_user(author) if not is_anonymous else {
+            "id": 0, "username": "", "nickname": "匿名用户", "avatar": "", "role": "",
+        },
     }
-    if liked or favorited:
+    if liked or hugged or favorited:
         payload["liked"] = liked
+        payload["hugged"] = hugged
         payload["favorited"] = favorited
     return payload
 
@@ -163,6 +171,7 @@ def _post_page_query(
     *,
     keyword: str | None = None,
     category: str | None = None,
+    mood_tag: str | None = None,
     sort: Literal["latest", "hot"] = "latest",
     user_id: int | None = None,
     favorite_only: bool = False,
@@ -185,6 +194,11 @@ def _post_page_query(
         category = category.strip()
         if category:
             query = query.filter(Post.category == category)
+
+    if mood_tag:
+        mood_tag = mood_tag.strip()
+        if mood_tag:
+            query = query.filter(Post.mood_tag == mood_tag)
 
     if sort == "hot":
         hot_score = Post.like_count + Post.comment_count + Post.view_count
@@ -247,6 +261,8 @@ def create_post(
         title=payload.title,
         content=payload.content,
         category=payload.category or "其他",
+        mood_tag=payload.mood_tag,
+        is_anonymous=payload.is_anonymous,
         image_url=_prepare_post_images(payload.image_urls, payload.image_url)[0],
         image_urls=_prepare_post_images(payload.image_urls, payload.image_url)[1],
     )
@@ -274,11 +290,12 @@ def list_posts(
     page_size: int = Query(default=10, ge=1, le=100),
     keyword: str | None = Query(default=None),
     category: str | None = Query(default=None),
+    mood_tag: str | None = Query(default=None),
     sort: Literal["latest", "hot"] = Query(default="latest"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    query = _post_page_query(db, keyword=keyword, category=category, sort=sort)
+    query = _post_page_query(db, keyword=keyword, category=category, mood_tag=mood_tag, sort=sort)
     total = query.count()
     posts = query.offset((page - 1) * page_size).limit(page_size).all()
     author_map = _load_users_map(db, [post.user_id for post in posts])
@@ -426,6 +443,8 @@ def delete_comment(
         db.rollback()
         raise
 
+    audit_log(current_user.id, "delete_comment", "comment", comment.id)
+
     response = CommentActionResponse.model_validate(
         {"comment_id": comment.id, "post_id": comment.post_id}
     )
@@ -535,6 +554,62 @@ def unlike_post(
         }
     )
     return {"code": 0, "message": "取消点赞成功", "data": response.model_dump()}
+
+
+@router.post("/{post_id}/hug")
+def hug_post(
+    post_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    post = _get_post_or_404(db, post_id)
+    existing = (
+        db.query(PostHug)
+        .filter(PostHug.post_id == post.id, PostHug.user_id == current_user.id)
+        .first()
+    )
+    if existing:
+        return {"code": 0, "message": "已经抱抱过了", "data": {"post_id": post.id, "hug_count": int(post.hug_count or 0), "hugged": True}}
+
+    hug = PostHug(post_id=post.id, user_id=current_user.id)
+    post.hug_count = int(post.hug_count or 0) + 1
+    db.add(hug)
+    db.add(post)
+    try:
+        db.commit()
+        db.refresh(post)
+    except IntegrityError:
+        db.rollback()
+        return {"code": 0, "message": "已经抱抱过了", "data": {"post_id": post.id, "hug_count": int(post.hug_count or 0), "hugged": True}}
+
+    return {"code": 0, "message": "抱抱成功", "data": {"post_id": post.id, "hug_count": int(post.hug_count or 0), "hugged": True}}
+
+
+@router.delete("/{post_id}/hug")
+def unhug_post(
+    post_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    post = _get_post_or_404(db, post_id)
+    existing = (
+        db.query(PostHug)
+        .filter(PostHug.post_id == post.id, PostHug.user_id == current_user.id)
+        .first()
+    )
+    if not existing:
+        return {"code": 0, "message": "尚未抱抱", "data": {"post_id": post.id, "hug_count": int(post.hug_count or 0), "hugged": False}}
+
+    db.delete(existing)
+    post.hug_count = max(0, int(post.hug_count or 0) - 1)
+    db.add(post)
+    try:
+        db.commit()
+        db.refresh(post)
+    except Exception:
+        db.rollback()
+        raise
+    return {"code": 0, "message": "已取消抱抱", "data": {"post_id": post.id, "hug_count": int(post.hug_count or 0), "hugged": False}}
 
 
 @router.post("/{post_id}/favorite")
@@ -659,6 +734,10 @@ def update_post(
         post.content = payload.content
     if payload.category is not None:
         post.category = payload.category
+    if payload.mood_tag is not None:
+        post.mood_tag = payload.mood_tag
+    if payload.is_anonymous is not None:
+        post.is_anonymous = payload.is_anonymous
     if payload.image_urls is not None or payload.image_url is not None:
         image_url, image_urls = _prepare_post_images(payload.image_urls, payload.image_url)
         post.image_url = image_url
@@ -696,6 +775,8 @@ def delete_post(
         db.rollback()
         raise
 
+    audit_log(current_user.id, "delete_post", "post", post.id, detail={"title": post.title})
+
     return {
         "code": 0,
         "message": "删除成功",
@@ -726,6 +807,12 @@ def get_post_detail(
         .first()
         is not None
     )
+    hugged = (
+        db.query(PostHug.id)
+        .filter(PostHug.post_id == post.id, PostHug.user_id == current_user.id)
+        .first()
+        is not None
+    )
     favorited = (
         db.query(Favorite.id)
         .filter(Favorite.post_id == post.id, Favorite.user_id == current_user.id)
@@ -734,6 +821,6 @@ def get_post_detail(
     )
 
     response = PostDetailResponse.model_validate(
-        _serialize_post(post, author, liked=liked, favorited=favorited)
+        _serialize_post(post, author, liked=liked, hugged=hugged, favorited=favorited)
     )
     return {"code": 0, "message": "获取成功", "data": response.model_dump()}

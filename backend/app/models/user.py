@@ -18,5 +18,7 @@ class User(Base):
     gender = Column(String(20), nullable=True)
     role = Column(String(20), nullable=False, default="user")
     status = Column(String(20), nullable=False, default="active")
+    failed_attempts = Column(Integer, nullable=False, default=0)
+    locked_until = Column(DateTime, nullable=True)
     created_at = Column(DateTime, nullable=False, server_default=func.now())
     updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
