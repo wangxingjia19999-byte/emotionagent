@@ -193,6 +193,7 @@ emotionagent/
 │   │   └── middleware.py      # 中间件
 │   ├── agent/                 # AI Agent 相关
 │   ├── RAG/                   # RAG 模块
+│   ├── mcp_server/            # MCP 服务器（FastMCP）
 │   ├── requirements.txt       # Python 依赖
 │   ├── .env                   # 环境变量（需创建）
 │   └── alembic/               # 数据库迁移
@@ -210,6 +211,56 @@ emotionagent/
 │   └── index.html             # 入口 HTML
 └── README.md                  # 项目说明
 ```
+
+## 🤖 MCP 服务器（AI 集成）
+
+本平台支持通过 **MCP (Model Context Protocol)** 将情绪分析能力暴露给外部 AI 应用。
+
+### 启动 MCP 服务器
+
+```bash
+# 方式 1: 使用启动脚本
+./start_mcp.sh              # HTTP 模式, 端口 8765
+./start_mcp.sh http 9000    # 自定义端口
+
+# 方式 2: 手动启动
+cd backend
+python -m mcp_server.server                    # HTTP 模式
+python -m mcp_server.server --transport sse    # SSE 模式
+python -m mcp_server.server --transport stdio  # stdio 模式
+```
+
+### 暴露的 MCP 能力
+
+| 类型 | 名称 | 说明 |
+|------|------|------|
+| Tool | `analyze_emotion` | 分析文本情绪状态 |
+| Tool | `emotion_assessment` | 情绪量表简评 |
+| Tool | `search_knowledge_base` | RAG 知识库检索 |
+| Tool | `get_user_profile` | 用户画像查询 |
+| Tool | `get_emotion_history` | 用户情绪记录 |
+| Tool | `get_conversation_memory` | 对话记忆查询 |
+| Tool | `get_questionnaire_history` | 问卷历史查询 |
+| Tool | `recommend_products` | 情绪商品推荐 |
+| Resource | `emotion://users/{id}/summary` | 用户情绪摘要 |
+| Resource | `emotion://knowledge/{topic}` | 情绪知识主题 |
+| Prompt | `companion_chat` | 情绪陪伴对话模板 |
+
+### 在 Claude Desktop 中使用
+
+编辑 `claude_desktop_config.json`：
+
+```json
+{
+  "mcpServers": {
+    "emotion-platform": {
+      "url": "http://localhost:8765/sse"
+    }
+  }
+}
+```
+
+或在 VS Code / Cursor 等 MCP 客户端中配置相同的 SSE 端点。
 
 ## 🔧 常见问题
 
@@ -303,6 +354,7 @@ alembic upgrade head
 - PyMySQL 1.1.1
 - LangChain 0.3.0+
 - MCP 1.0.0+
+- FastMCP 3.0.0+
 
 ### 前端主要依赖
 - Vue 3.5.10
