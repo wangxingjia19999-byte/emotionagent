@@ -1,13 +1,13 @@
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.user import User
 from app.schemas.user import PasswordChange, ProfileUpdate
-from app.utils.jwt import get_current_user
+from app.utils.jwt import add_token_to_blacklist, get_current_user
 from app.utils.security import hash_password, verify_password
 
 
@@ -125,3 +125,17 @@ def change_password(payload: PasswordChange, db: Session = Depends(get_db), curr
     db.commit()
 
     return {"code": 0, "message": "密码修改成功", "data": None}
+
+
+@router.post("/logout")
+async def logout(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+):
+    """退出登录，将当前 token 加入黑名单"""
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+        await add_token_to_blacklist(token)
+
+    return {"code": 0, "message": "已退出登录", "data": None}

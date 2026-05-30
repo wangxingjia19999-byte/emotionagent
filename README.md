@@ -193,6 +193,7 @@ emotionagent/
 │   │   └── middleware.py      # 中间件
 │   ├── agent/                 # AI Agent 相关
 │   ├── RAG/                   # RAG 模块
+│   ├── mcp_server/            # MCP 服务器（FastMCP）
 │   ├── requirements.txt       # Python 依赖
 │   ├── .env                   # 环境变量（需创建）
 │   └── alembic/               # 数据库迁移
@@ -210,6 +211,56 @@ emotionagent/
 │   └── index.html             # 入口 HTML
 └── README.md                  # 项目说明
 ```
+
+## 🤖 MCP 服务器（AI 集成）
+
+本平台支持通过 **MCP (Model Context Protocol)** 将情绪分析能力暴露给外部 AI 应用。
+
+### 启动 MCP 服务器
+
+```bash
+# 方式 1: 使用启动脚本
+./start_mcp.sh              # HTTP 模式, 端口 8765
+./start_mcp.sh http 9000    # 自定义端口
+
+# 方式 2: 手动启动
+cd backend
+python -m mcp_server.server                    # HTTP 模式
+python -m mcp_server.server --transport sse    # SSE 模式
+python -m mcp_server.server --transport stdio  # stdio 模式
+```
+
+### 暴露的 MCP 能力
+
+| 类型 | 名称 | 说明 |
+|------|------|------|
+| Tool | `analyze_emotion` | 分析文本情绪状态 |
+| Tool | `emotion_assessment` | 情绪量表简评 |
+| Tool | `search_knowledge_base` | RAG 知识库检索 |
+| Tool | `get_user_profile` | 用户画像查询 |
+| Tool | `get_emotion_history` | 用户情绪记录 |
+| Tool | `get_conversation_memory` | 对话记忆查询 |
+| Tool | `get_questionnaire_history` | 问卷历史查询 |
+| Tool | `recommend_products` | 情绪商品推荐 |
+| Resource | `emotion://users/{id}/summary` | 用户情绪摘要 |
+| Resource | `emotion://knowledge/{topic}` | 情绪知识主题 |
+| Prompt | `companion_chat` | 情绪陪伴对话模板 |
+
+### 在 Claude Desktop 中使用
+
+编辑 `claude_desktop_config.json`：
+
+```json
+{
+  "mcpServers": {
+    "emotion-platform": {
+      "url": "http://localhost:8765/sse"
+    }
+  }
+}
+```
+
+或在 VS Code / Cursor 等 MCP 客户端中配置相同的 SSE 端点。
 
 ## 🔧 常见问题
 
@@ -269,6 +320,62 @@ source venv/bin/activate  # macOS/Linux
 2. **热更新**：Vite 会自动刷新浏览器
 3. **API 调试**：使用浏览器开发者工具调试
 
+## 📦 Redis 缓存
+
+项目使用 Redis 提供缓存、Token 黑名单和消息队列支持。
+
+### 安装 Redis
+
+```bash
+# macOS
+brew install redis && brew services start redis
+
+# Ubuntu/Debian
+sudo apt install redis-server && sudo systemctl start redis
+
+# Docker
+docker run -d --name redis -p 6379:6379 redis:7-alpine
+```
+
+### .env 配置
+
+```env
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=
+REDIS_DB=0
+```
+
+**Redis 提供的功能：**
+- **API 缓存** — `@cache_result(ttl=60)` 装饰器缓存接口结果
+- **Token 黑名单** — 退出登录后将 token 加入黑名单，即时失效
+- **限流存储** — 多进程共享限流计数（生产环境推荐切换）
+
+## 📬 消息队列 (arq)
+
+使用 arq（基于 Redis 的异步任务队列）处理后台任务。
+
+### 启动 Worker
+
+```bash
+# 使用启动脚本
+./start_worker.sh
+
+# 或手动启动
+cd backend
+python -m arq backend.app.worker.WorkerSettings
+```
+
+**后台任务列表：**
+| 任务 | 说明 |
+|------|------|
+| `send_verification_email_task` | 异步发送验证码邮件 |
+| `send_notification_email_task` | 异步发送通知邮件 |
+| `save_emotion_log_task` | 异步保存情绪记录 |
+| `send_email_task` | 通用异步邮件发送 |
+
+**注意：** 如果未启动 Worker，邮件会回退到同步发送。
+
 ## 🗄️ 数据库初始化
 
 如果需要从零开始初始化数据库：
@@ -303,6 +410,9 @@ alembic upgrade head
 - PyMySQL 1.1.1
 - LangChain 0.3.0+
 - MCP 1.0.0+
+- FastMCP 3.0.0+
+- Redis 5.0.0+
+- arq 0.26.0+
 
 ### 前端主要依赖
 - Vue 3.5.10

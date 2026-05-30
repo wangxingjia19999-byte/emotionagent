@@ -10,6 +10,11 @@ export function chatWithEnhancedAgent(message, userId = null) {
   return request.post('/agent/chat/enhanced', { message, user_id: userId })
 }
 
+/** 多 Agent 对话（Supervisor 架构，含商城推荐） */
+export function chatWithMultiAgent(message, userId = null) {
+  return request.post('/agent/chat/multi', { message, user_id: userId })
+}
+
 /** 获取 Agent 可用工具列表 */
 export function getAgentTools() {
   return request.get('/agent/tools')
@@ -53,4 +58,14 @@ export function getPresetMCPServers() {
 /** 导入预设到数据库 */
 export function loadPresetsToDB() {
   return request.post('/mcp/presets/load')
+}
+
+/** 获取 AI 聊天历史会话列表 */
+export function getChatSessions(page = 1, pageSize = 20) {
+  return request.get('/agent/sessions', { params: { page, page_size: pageSize } })
+}
+
+/** 获取单个会话详情（含消息列表） */
+export function getChatSessionDetail(sessionId) {
+  return request.get(`/agent/sessions/${sessionId}`)
 }

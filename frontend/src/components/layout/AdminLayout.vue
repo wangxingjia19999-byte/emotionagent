@@ -28,7 +28,10 @@
       <div class="admin-sidebar__footer">
         <div class="admin-sidebar__user">
           <span>{{ adminUser?.nickname || adminUser?.username || '管理员' }}</span>
+          <span class="admin-sidebar__role">{{ adminUser?.role === 'super_admin' ? '超级管理员' : '管理员' }}</span>
         </div>
+        <button class="admin-sidebar__btn" @click="openChangePwd">🔑 修改密码</button>
+        <button class="admin-sidebar__btn" @click="handleLogout">🚪 退出登录</button>
         <button class="admin-sidebar__back" @click="goBack">← 返回主站</button>
       </div>
     </aside>
@@ -52,9 +55,10 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { adminLogout, adminChangePassword } from '@/api/auth'
 
 const route = useRoute()
 const router = useRouter()
@@ -72,6 +76,7 @@ const navGroups = [
     label: '概览',
     items: [
       { path: '/admin', label: '仪表盘', icon: '▦' },
+      { path: '/admin/stats', label: '数据统计', icon: '◈' },
     ],
   },
   {
@@ -86,6 +91,14 @@ const navGroups = [
     label: '用户管理',
     items: [
       { path: '/admin/users', label: '用户列表', icon: '▨' },
+      { path: '/admin/admins', label: '管理员管理', icon: '⚙' },
+    ],
+  },
+  {
+    label: '安全与审核',
+    items: [
+      { path: '/admin/crisis-alerts', label: '危机预警', icon: '⚠' },
+      { path: '/admin/posts', label: '帖子管理', icon: '▣' },
     ],
   },
   {
@@ -96,9 +109,15 @@ const navGroups = [
     ],
   },
   {
-    label: '内容审核',
+    label: 'AI 管理',
     items: [
-      { path: '/admin/posts', label: '帖子管理', icon: '▣' },
+      { path: '/admin/agent-config', label: 'Agent 配置', icon: '🤖' },
+    ],
+  },
+  {
+    label: '系统',
+    items: [
+      { path: '/admin/audit-logs', label: '审计日志', icon: '◷' },
     ],
   },
 ]
@@ -112,6 +131,11 @@ const pageTitleMap = {
   '/admin/questionnaires': '问卷记录',
   '/admin/emotion-logs': '情绪日志',
   '/admin/posts': '帖子管理',
+  '/admin/admins': '管理员管理',
+  '/admin/crisis-alerts': '危机预警',
+  '/admin/audit-logs': '审计日志',
+  '/admin/stats': '数据统计',
+  '/admin/agent-config': 'Agent 配置',
 }
 
 const pageTitle = computed(() => {
@@ -132,6 +156,56 @@ function checkAdminRole() {
 function tick() {
   const d = new Date()
   nowStr.value = d.toLocaleString('zh-CN', { hour12: false })
+}
+
+async function handleLogout() {
+  try {
+    await adminLogout()
+  } catch { /* ignore if fails */ }
+  localStorage.removeItem('access_token')
+  localStorage.removeItem('refresh_token')
+  localStorage.removeItem('user')
+  router.replace('/admin/login')
+  ElMessage.success('已退出登录')
+}
+
+async function openChangePwd() {
+  try {
+    const { value: formValues } = await ElMessageBox.prompt('请输入新密码（至少8位）', '修改密码', {
+      confirmButtonText: '确认修改',
+      cancelButtonText: '取消',
+      inputType: 'password',
+      inputValidator: (val) => {
+        if (!val || val.length < 8) return '密码长度不能少于8位'
+        return true
+      },
+      beforeClose: async (action, instance, done) => {
+        if (action === 'confirm') {
+          const newPassword = instance.inputValue
+          // 获取旧密码
+          try {
+            const { value: oldPwd } = await ElMessageBox.prompt('请先输入当前密码', '验证身份', {
+              confirmButtonText: '确认',
+              cancelButtonText: '取消',
+              inputType: 'password',
+            })
+            if (!oldPwd) { done(); return }
+            try {
+              await adminChangePassword({ old_password: oldPwd, new_password: newPassword })
+              ElMessage.success('密码已修改，请重新登录')
+              localStorage.removeItem('access_token')
+              localStorage.removeItem('refresh_token')
+              localStorage.removeItem('user')
+              router.replace('/admin/login')
+            } catch (e) {
+              ElMessage.error(e?.response?.data?.detail || '修改失败')
+            }
+          } catch { /* cancelled */ }
+        }
+        done()
+      },
+    })
+  } catch { /* cancelled */ }
 }
 
 onMounted(() => {
@@ -241,24 +315,49 @@ onBeforeUnmount(() => {
 .admin-sidebar__user {
   color: #ccd6f6;
   font-size: 13px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.admin-sidebar__role {
+  font-size: 11px;
+  color: #5a6a8a;
+}
+
+.admin-sidebar__btn {
+  width: 100%;
+  padding: 8px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 6px;
+  color: #8892b0;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 6px;
+}
+
+.admin-sidebar__btn:hover {
+  background: rgba(255,255,255,0.12);
+  color: #ccd6f6;
 }
 
 .admin-sidebar__back {
   width: 100%;
   padding: 8px;
-  background: rgba(255,255,255,0.08);
-  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(100, 255, 218, 0.08);
+  border: 1px solid rgba(100, 255, 218, 0.2);
   border-radius: 6px;
-  color: #8892b0;
+  color: #64ffda;
   font-size: 13px;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .admin-sidebar__back:hover {
-  background: rgba(255,255,255,0.14);
-  color: #ccd6f6;
+  background: rgba(100, 255, 218, 0.16);
 }
 
 .admin-main {

@@ -382,7 +382,27 @@ CREATE TABLE IF NOT EXISTS orders (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
--- 23. order_items - 订单项表
+-- 23. ai_chat_sessions - AI 聊天会话记录表
+-- ============================================================
+CREATE TABLE IF NOT EXISTS ai_chat_sessions (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    user_id BIGINT NOT NULL,
+    title VARCHAR(200) NOT NULL DEFAULT '',
+    agent_used VARCHAR(50) NOT NULL DEFAULT 'emotion_companion',
+    message_count INT NOT NULL DEFAULT 0,
+    first_message TEXT,
+    last_message TEXT,
+    crisis_detected INT NOT NULL DEFAULT 0 COMMENT '是否触发危机检测: 0=否 1=是',
+    messages_json TEXT COMMENT 'JSON 格式存储本轮对话',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_ai_chat_sessions_user_id (user_id),
+    INDEX idx_ai_chat_sessions_created_at (created_at),
+    CONSTRAINT fk_ai_chat_sessions_user_id FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- 24. order_items - 订单项表
 -- ============================================================
 CREATE TABLE IF NOT EXISTS order_items (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,

@@ -13,6 +13,37 @@ from app.models.admin import Admin
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
+# ── Token 黑名单（Redis）───────────────────────────
+BLACKLIST_PREFIX = "blacklist:tokens:"
+
+
+async def add_token_to_blacklist(token: str) -> None:
+    """将 token 加入 Redis 黑名单，TTL 对齐 token 剩余有效期"""
+    from app.redis import get_redis as _get_redis
+
+    r = await _get_redis()
+    try:
+        payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
+        exp = payload.get("exp")
+        if exp:
+            now = datetime.now(timezone.utc).timestamp()
+            ttl = int(exp - now)
+            if ttl > 0:
+                await r.setex(f"{BLACKLIST_PREFIX}{token}", ttl, "1")
+    except JWTError:
+        pass  # 无法解码的 token 不需要加入黑名单
+
+
+async def is_token_blacklisted(token: str) -> bool:
+    """检查 token 是否在黑名单中"""
+    from app.redis import get_redis as _get_redis
+
+    try:
+        r = await _get_redis()
+        return await r.exists(f"{BLACKLIST_PREFIX}{token}") > 0
+    except RuntimeError:
+        return False  # Redis 不可用时跳过检查
+
 
 def create_access_token(subject: str, extra_data: dict[str, Any] | None = None) -> str:
     expire = datetime.now(timezone.utc) + timedelta(minutes=settings.jwt_access_expire_minutes)
@@ -35,14 +66,20 @@ def decode_token(token: str) -> dict[str, Any]:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token无效或已过期")
 
 
-def get_current_user(
+async def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     db: Session = Depends(get_db),
 ) -> User:
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="未登录或Token缺失")
 
-    payload = decode_token(credentials.credentials)
+    token = credentials.credentials
+
+    # 黑名单检查
+    if await is_token_blacklisted(token):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token已失效（已登出）")
+
+    payload = decode_token(token)
     if payload.get("type") != "access":
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="请使用 access token")
 
@@ -58,7 +95,7 @@ def get_current_user(
     return user
 
 
-def get_current_admin(
+async def get_current_admin(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     db: Session = Depends(get_db),
 ) -> Admin:
@@ -66,7 +103,13 @@ def get_current_admin(
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="未登录或 Token 缺失")
 
-    payload = decode_token(credentials.credentials)
+    token = credentials.credentials
+
+    # 黑名单检查
+    if await is_token_blacklisted(token):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token已失效（已登出）")
+
+    payload = decode_token(token)
     if payload.get("type") != "access":
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="请使用 access token")
 

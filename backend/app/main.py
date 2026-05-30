@@ -17,6 +17,8 @@ from slowapi.util import get_remote_address
 from app.config import settings
 from app.database import Base, SessionLocal, engine
 from app.middleware import RequestIDMiddleware, global_exception_handler, http_exception_handler
+from app.redis import init_redis, close_redis
+from app.tasks import init_arq, close_arq
 
 # ── 结构化日志 ───────────────────────────────────────────
 logging.basicConfig(
@@ -38,12 +40,14 @@ import app.models.emotion_log as _emotion_log_model  # noqa: F401
 import app.models.shop as _shop_model  # noqa: F401
 import app.models.user_profile as _profile_model  # noqa: F401
 import app.models.admin as _admin_model  # noqa: F401
+import app.models.ai_chat_session as _ai_chat_model  # noqa: F401
 import app.models.verification_code as _vc_model  # noqa: F401
 
 from app.routers import agent, auth, friends, home, mcp, posts, private_message, questionnaire, shop, user, admin
 from app.routers import admin_auth
 
 # ── 限流器 ──────────────────────────────────────────────────
+# 生产环境可改为 Redis 存储: storage_uri="redis://localhost:6379/0"
 limiter = Limiter(key_func=get_remote_address, default_limits=["60/minute"])
 
 # ── App 创建 ──────────────────────────────────────────────
@@ -85,18 +89,41 @@ app.add_exception_handler(RequestValidationError, lambda req, exc: JSONResponse(
 
 # ── 启动事件 ──────────────────────────────────────────────
 @app.on_event("startup")
-def startup() -> None:
+async def startup() -> None:
     logger.info("app_startup", extra={"app": settings.app_name, "version": settings.app_version})
 
     # 自动建表（开发环境），生产环境应使用 alembic upgrade head
     Base.metadata.create_all(bind=engine)
 
+    # 初始化 Redis
+    try:
+        await init_redis()
+        logger.info("redis_initialized")
+    except Exception as e:
+        logger.warning("redis_init_failed", extra={"error": str(e)})
+
+    # 初始化 arq 消息队列连接
+    try:
+        await init_arq()
+        logger.info("arq_initialized")
+    except Exception as e:
+        logger.warning("arq_init_failed", extra={"error": str(e)})
+
     logger.info("app_started")
 
 
 @app.on_event("shutdown")
-def shutdown() -> None:
+async def shutdown() -> None:
     logger.info("app_shutdown")
+    try:
+        await close_arq()
+    except Exception:
+        pass
+    try:
+        await close_redis()
+    except Exception:
+        pass
+    logger.info("app_stopped")
 
 
 # ── 健康检查 ──────────────────────────────────────────────

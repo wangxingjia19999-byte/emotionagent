@@ -21,10 +21,17 @@ pydantic-settings==2.5.2
 
 slowapi==0.1.9
 
+# Redis 缓存 & 消息队列
+
+redis[hiredis]>=5.0.0
+arq>=0.26.0
+
 # MCP（Model Context Protocol）集成
 
 mcp>=1.0.0
 langchain-mcp-adapters>=0.1.0
+# FastMCP — 将本平台能力暴露为 MCP 服务器供外部 AI 应用调用
+fastmcp>=3.0.0
 
 # LangChain / Agent 相关依赖
 

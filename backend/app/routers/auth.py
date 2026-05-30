@@ -25,6 +25,7 @@ from app.utils.jwt import (
 )
 from app.utils.mailer import send_verification_email
 from app.utils.security import hash_password, verify_password
+from app.tasks import enqueue_send_verification_email
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 limiter = Limiter(key_func=get_remote_address)
@@ -72,8 +73,8 @@ def _generate_account(db: Session) -> str:
 
 @router.post("/send-verify-code")
 @limiter.limit("3/minute")
-def send_verify_code(request: Request, payload: SendVerifyCodeRequest, db: Session = Depends(get_db)):
-    """向指定邮箱发送 6 位验证码（5 分钟有效）"""
+async def send_verify_code(request: Request, payload: SendVerifyCodeRequest, db: Session = Depends(get_db)):
+    """向指定邮箱发送 6 位验证码（5 分钟有效，后台异步发送）"""
     email = payload.email.strip().lower()
 
     # 60 秒内不允许重复发送
@@ -101,6 +102,15 @@ def send_verify_code(request: Request, payload: SendVerifyCodeRequest, db: Sessi
     db.add(vc)
     db.commit()
 
+    # 尝试通过消息队列异步发送邮件，失败则同步发送作为回退
+    try:
+        job_id = await enqueue_send_verification_email(email, code)
+        if job_id:
+            return {"code": 0, "message": f"验证码已发送至 {email}，5分钟内有效", "data": None}
+    except RuntimeError:
+        pass  # arq 未初始化，回退到同步发送
+
+    # 同步回退
     ok = send_verification_email(email, code)
     if not ok:
         raise HTTPException(
