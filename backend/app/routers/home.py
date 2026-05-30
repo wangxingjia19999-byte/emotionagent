@@ -140,6 +140,34 @@ def _count_unread_messages(db: Session, inspector, user_id: int) -> int:
     return 0
 
 
+def _count_from_memory_file(user_id: int) -> int:
+    """从对话记忆 JSONL 文件统计某个用户的 AI 聊天次数"""
+    import json
+    from pathlib import Path
+
+    memory_file = (
+        Path(__file__).resolve().parent.parent.parent
+        / "agent" / "memory" / "conversation_memory.jsonl"
+    )
+    if not memory_file.exists():
+        return 0
+
+    count = 0
+    try:
+        with memory_file.open("r", encoding="utf-8") as f:
+            for line in f:
+                try:
+                    record = json.loads(line.strip())
+                except json.JSONDecodeError:
+                    continue
+                if str(record.get("user_id", "")) == str(user_id):
+                    count += 1
+    except Exception:
+        return 0
+
+    return count
+
+
 def _format_datetime(value: Any) -> str | None:
     if value is None:
         return None
@@ -149,38 +177,22 @@ def _format_datetime(value: Any) -> str | None:
 
 
 def _get_recent_ai_session(db: Session, inspector, user_id: int) -> dict[str, Any] | None:
-    table_name = _find_table(inspector, AI_SESSION_TABLES)
-    if not table_name:
-        return None
+    """获取用户最近一次 AI 聊天会话"""
+    from app.models.ai_chat_session import AiChatSession
 
-    user_column = _find_column(inspector, table_name, USER_COLUMNS)
-    if not user_column:
-        return None
-
-    id_column = _find_column(inspector, table_name, ["id", "session_id", "conversation_id"])
-    if not id_column:
-        return None
-
-    title_column = _find_column(inspector, table_name, TITLE_COLUMNS)
-    updated_column = _find_column(inspector, table_name, UPDATED_COLUMNS)
-    order_column = updated_column or id_column
-    title_select = f"`{title_column}` AS title" if title_column else "'' AS title"
-    updated_select = f"`{updated_column}` AS updated_at" if updated_column else "NULL AS updated_at"
-
-    sql = (
-        f"SELECT `{id_column}` AS id, {title_select}, {updated_select} "
-        f"FROM `{table_name}` WHERE `{user_column}` = :user_id "
-        f"ORDER BY `{order_column}` DESC, `{id_column}` DESC LIMIT 1"
+    session = (
+        db.query(AiChatSession)
+        .filter(AiChatSession.user_id == user_id)
+        .order_by(AiChatSession.updated_at.desc())
+        .first()
     )
-
-    row = db.execute(text(sql), {"user_id": user_id}).mappings().first()
-    if not row:
+    if not session:
         return None
 
     return {
-        "id": int(row["id"] or 0),
-        "title": str(row["title"] or "最近一次情绪陪伴"),
-        "updated_at": _format_datetime(row.get("updated_at")),
+        "id": session.id,
+        "title": session.title or "最近一次情绪陪伴",
+        "updated_at": _format_datetime(session.updated_at),
     }
 
 
@@ -231,8 +243,12 @@ def _get_recent_posts(db: Session, inspector) -> list[dict[str, Any]]:
 def get_home_overview(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     inspector = _get_inspector(db)
 
+    # AI 聊天次数：直接从 ai_chat_sessions 表统计
+    from app.models.ai_chat_session import AiChatSession
+    ai_count = db.query(AiChatSession).filter(AiChatSession.user_id == current_user.id).count()
+
     statistics = {
-        "ai_chat_count": _count_user_rows(db, inspector, AI_SESSION_TABLES, current_user.id),
+        "ai_chat_count": ai_count,
         "friend_count": _count_friends(db, inspector, current_user.id),
         "post_count": _count_user_rows(db, inspector, POST_TABLES, current_user.id),
         "favorite_count": _count_user_rows(db, inspector, FAVORITE_TABLES, current_user.id),

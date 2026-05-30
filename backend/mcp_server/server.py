@@ -48,6 +48,11 @@ from mcp_server.tools.emotion_tools import (
     get_emotion_history,
     get_user_profile,
     recommend_products,
+    get_user_activity_overview,
+    get_my_posts,
+    get_unread_messages,
+    get_community_square_posts,
+    publish_community_post,
 )
 from mcp_server.tools.knowledge_tools import (
     get_conversation_memory,
@@ -74,8 +79,13 @@ mcp = FastMCP(
 - get_emotion_history — 查看用户近期情绪变化
 - get_conversation_memory — 查看最近的对话记录
 - get_questionnaire_history — 查看用户的问卷测评历史
+- get_user_activity_overview — 查看用户平台活动概况（AI聊天次数/帖子数/未读消息等）
+- get_my_posts — 查看用户自己发表的帖子
+- get_unread_messages — 查看用户的未读私信
 
-**推荐类：**
+**社区与推荐类：**
+- get_community_square_posts — 查看社区广场帖子，分析社区集体情绪氛围
+- publish_community_post — 帮用户在社区广场发布帖子（需先获得用户许可）
 - recommend_products — 根据情绪状态推荐减压商品
 
 使用原则：
@@ -113,6 +123,31 @@ mcp.tool(
     name="recommend_products",
     description="根据用户的情绪状态推荐商城减压商品。需要提供 user_id，可选 emotion_label。",
 )(recommend_products)
+
+mcp.tool(
+    name="get_user_activity_overview",
+    description="获取用户在平台上的活动概况（AI聊天次数、帖子数、收藏数、未读私信数、好友数）。需要提供 user_id。",
+)(get_user_activity_overview)
+
+mcp.tool(
+    name="get_my_posts",
+    description="查看用户自己发表的帖子列表，包含标题、内容预览、心情标签、互动数据。需要提供 user_id。",
+)(get_my_posts)
+
+mcp.tool(
+    name="get_unread_messages",
+    description="查看用户的未读私信，包括发送者、内容预览和时间。需要提供 user_id。",
+)(get_unread_messages)
+
+mcp.tool(
+    name="get_community_square_posts",
+    description="查看社区广场的帖子，可按关键词、心情标签、分类筛选，支持最新/最热排序。用于分析社区集体情绪氛围。",
+)(get_community_square_posts)
+
+mcp.tool(
+    name="publish_community_post",
+    description="帮用户在社区广场发布帖子。使用前必须先告知用户并获得许可。需要 user_id、title、content，可选 mood_tag、category、is_anonymous。",
+)(publish_community_post)
 
 mcp.tool(
     name="search_knowledge_base",

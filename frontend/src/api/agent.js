@@ -59,3 +59,13 @@ export function getPresetMCPServers() {
 export function loadPresetsToDB() {
   return request.post('/mcp/presets/load')
 }
+
+/** 获取 AI 聊天历史会话列表 */
+export function getChatSessions(page = 1, pageSize = 20) {
+  return request.get('/agent/sessions', { params: { page, page_size: pageSize } })
+}
+
+/** 获取单个会话详情（含消息列表） */
+export function getChatSessionDetail(sessionId) {
+  return request.get(`/agent/sessions/${sessionId}`)
+}

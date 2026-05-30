@@ -86,6 +86,127 @@ def get_emotion_history(user_id: str, days: int = 7) -> str:
     return _history.invoke({"user_id": user_id, "days": days})
 
 
+def get_user_activity_overview(user_id: str) -> str:
+    """
+    获取用户在平台上的活动概况，包括：AI 聊天次数、发表的帖子数、
+    收藏数、未读私信数和好友数。
+
+    适用场景：
+    - 首次接触用户时了解其平台参与度
+    - 用户询问"我的数据"、"我的活动"时
+    - 作为对话前的用户背景了解
+
+    Args:
+        user_id: 用户 ID（数字字符串）
+    """
+    from agent.agent_service import get_user_activity_overview as _overview
+    return _overview.invoke({"user_id": user_id})
+
+
+def get_my_posts(user_id: str, limit: int = 10) -> str:
+    """
+    查看用户自己发表的帖子列表，包括标题、内容预览、心情标签、互动数据。
+
+    适用场景：
+    - 用户提到"我的帖子"、"我之前分享过"
+    - 了解用户的历史分享和心情变化
+    - 分析用户通过帖子自我表达的情绪模式
+
+    Args:
+        user_id: 用户 ID（数字字符串）
+        limit: 返回条数，默认 10，最大 20
+    """
+    from agent.agent_service import get_my_posts as _posts
+    return _posts.invoke({"user_id": user_id, "limit": limit})
+
+
+def get_unread_messages(user_id: str) -> str:
+    """
+    查看用户的未读私信，包括未读总数、每条消息的发送者和内容预览。
+
+    适用场景：
+    - 用户问"有人找我吗"、"有消息吗"
+    - 检查用户是否错过了社交互动
+    - 了解用户近期收到的关心和联系
+
+    Args:
+        user_id: 用户 ID（数字字符串）
+    """
+    from agent.agent_service import get_unread_messages as _unread
+    return _unread.invoke({"user_id": user_id})
+
+
+def get_community_square_posts(
+    keyword: str = "",
+    mood_tag: str = "",
+    category: str = "",
+    sort: str = "latest",
+    limit: int = 10,
+) -> str:
+    """
+    查看社区广场的帖子，了解社区中其他用户的分享和情绪状态。
+    可以按关键词、心情标签、分类筛选，支持最新/最热排序。
+
+    适用场景：
+    - 用户问"社区最近怎么样"、"大家都在聊什么"
+    - 了解特定情绪（如"焦虑"、"难过"）的社区用户分享
+    - 分析社区集体情绪氛围
+    - 在对话中引入"社区中也有其他人经历了类似的感受"来减轻用户孤独感
+
+    Args:
+        keyword: 搜索关键词（搜索标题和内容），留空则不搜索
+        mood_tag: 心情标签筛选（如 焦虑/难过/开心/愤怒/孤独/温暖/平静），留空则不筛选
+        category: 分类筛选（情绪倾诉/学习生活/人际关系/校园日常/其他），留空则不筛选
+        sort: 排序方式，latest=最新，hot=最热
+        limit: 返回条数，默认 10，最大 20
+    """
+    from agent.agent_service import get_community_square_posts as _community
+    return _community.invoke({
+        "keyword": keyword,
+        "mood_tag": mood_tag,
+        "category": category,
+        "sort": sort,
+        "limit": limit,
+    })
+
+
+def publish_community_post(
+    user_id: str,
+    title: str,
+    content: str,
+    mood_tag: str = "",
+    category: str = "情绪倾诉",
+    is_anonymous: bool = False,
+) -> str:
+    """
+    帮用户在社区广场发布一篇帖子，将心情分享给社区。
+
+    适用场景：
+    - 用户心情低落，agent 帮ta整理心情并发帖寻求社区支持
+    - 用户想分享感受，agent 代为撰写并发布
+    - 作为情绪安抚策略：将内心感受写出来获得社区回应
+
+    ⚠️ 使用前必须先告知用户并获得许可，不要擅自代发。
+
+    Args:
+        user_id: 用户 ID（数字字符串）
+        title: 帖子标题（1-100字）
+        content: 帖子正文
+        mood_tag: 心情标签（开心/难过/焦虑/愤怒/温暖/平静/孤独/恐惧/惊讶/感激）
+        category: 分类（情绪倾诉/学习生活/人际关系/校园日常/其他），默认"情绪倾诉"
+        is_anonymous: 是否匿名发布，默认 False
+    """
+    from agent.agent_service import publish_community_post as _publish
+    return _publish.invoke({
+        "user_id": user_id,
+        "title": title,
+        "content": content,
+        "mood_tag": mood_tag,
+        "category": category,
+        "is_anonymous": is_anonymous,
+    })
+
+
 def recommend_products(user_id: str, emotion_label: str = "", limit: int = 5) -> str:
     """
     根据用户的情绪状态，从商城推荐适合的减压/陪伴商品。

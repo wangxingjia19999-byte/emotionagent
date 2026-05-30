@@ -40,6 +40,7 @@ import app.models.emotion_log as _emotion_log_model  # noqa: F401
 import app.models.shop as _shop_model  # noqa: F401
 import app.models.user_profile as _profile_model  # noqa: F401
 import app.models.admin as _admin_model  # noqa: F401
+import app.models.ai_chat_session as _ai_chat_model  # noqa: F401
 import app.models.verification_code as _vc_model  # noqa: F401
 
 from app.routers import agent, auth, friends, home, mcp, posts, private_message, questionnaire, shop, user, admin

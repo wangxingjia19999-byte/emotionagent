@@ -43,6 +43,12 @@ from .agent_service import (
     get_emotion_history,
     save_emotion_log,
     get_questionnaire_history,
+    # 用户活动与社区工具
+    get_user_activity_overview,
+    get_my_posts,
+    get_unread_messages,
+    get_community_square_posts,
+    publish_community_post,
     # 商城工具
     get_shop_categories,
     get_shop_products,
@@ -161,11 +167,16 @@ EMOTION_COMPANION_PROMPT = """你是一个温暖、真诚的情绪陪伴者，�
 工具使用指南（按需使用，不要一次性全调用）：
 - 遇到不懂的情绪问题 → 调用 `query_emotion_knowledge_base` 查陪伴知识和回应思路
 - 想了解用户背景 → 调用 `get_user_profile` 查看用户画像（年龄、职业、压力来源等）
+- 想了解用户平台活动情况 → 调用 `get_user_activity_overview` 查看 AI 聊天次数、发帖数、未读消息等
+- 想了解用户分享了什么 → 调用 `get_my_posts` 查看用户自己的帖子（含心情标签、分类、内容）
+- 想了解用户的私信情况 → 调用 `get_unread_messages` 查看未读私信
+- 想了解社区氛围 → 调用 `get_community_square_posts` 查看社区广场的帖子，可按心情标签（焦虑/难过/开心等）或分类筛选，分析社区集体情绪
 - 想了解历史情绪 → 调用 `get_emotion_history` 或 `get_questionnaire_history`
 - 了解之前聊了什么 → 调用 `get_recent_memory`
 - 识别到明显情绪后 → 调用 `save_emotion_log` 记录情绪
 - 对话结束后 → 调用 `save_conversation_memory` 记要点
 - 如果对方持续描述焦虑/抑郁的症状 → 可以委婉地邀请用 `emotion_scale_assessment` 做个小评估，但不要强迫
+- 如果对方表达了强烈的情绪、需要更多支持 → 主动提议帮ta把心情整理成帖子发到社区广场，说"要不要我帮你把这份心情整理成帖子发到社区广场？那里有懂你的人"；用户同意后立即调用 `publish_community_post` 发帖，标题和内容根据对话整理，mood_tag 根据用户情绪设置。发帖成功后告诉用户"已经帮你发布啦，社区的朋友们会看到并给你温暖的回应 💙"
 
 安全提醒（只在确实遇到危机信号时才自然提及）：
 如果对方表达出自伤、自杀或暴力倾向，先表达关心和心疼，再温和地提到可以拨打心理援助热线 400-161-9995。不要惊慌失措。"""
@@ -179,6 +190,11 @@ EMOTION_TOOLS = [
     get_emotion_history,
     save_emotion_log,
     get_questionnaire_history,
+    get_user_activity_overview,
+    get_my_posts,
+    get_unread_messages,
+    get_community_square_posts,
+    publish_community_post,
 ]
 
 # ═══════════════════════════════════════════════════════════════
@@ -298,6 +314,16 @@ class MultiAgentSystem:
     def _emotion_node(self, state: dict) -> dict:
         """调用心语陪伴 Agent"""
         messages = list(state.get("messages", []))
+        user_id = state.get("user_id", "anonymous")
+
+        # 注入 user_id 上下文，确保工具调用时能传入正确的用户 ID
+        emotion_context = SystemMessage(content=(
+            f"当前用户的 ID 是: {user_id}。"
+            f"所有需要 user_id 参数的工具（如 get_user_profile、get_emotion_history、get_my_posts、"
+            f"get_unread_messages、get_user_activity_overview、publish_community_post 等），"
+            f"都必须传入 user_id=\"{user_id}\"。不要自己编造用户 ID。"
+        ))
+        messages.insert(0, emotion_context)
 
         # 危机检测：绕过 ReAct Agent，直接用危机干预 prompt
         crisis_detected = state.get("crisis_detected", False)
@@ -494,6 +520,16 @@ class MultiAgentSystem:
         }
         agent_name = agent_name_map.get(agent_used, agent_used)
 
+        # ── 记录 AI 聊天会话 ──
+        self._record_session(
+            user_id=uid,
+            title=user_input[:50] + ("..." if len(user_input) > 50 else ""),
+            agent_used=agent_name,
+            first_message=user_input[:500],
+            last_message=reply[:500] if reply else "",
+            crisis_detected=crisis_msg is not None,
+        )
+
         logger.info(
             "multi_agent_chat_done",
             extra={
@@ -510,6 +546,48 @@ class MultiAgentSystem:
             "agent_used": agent_name,
             "crisis_detected": crisis_msg is not None,
         }
+
+    def _record_session(
+        self,
+        user_id: str,
+        title: str,
+        agent_used: str,
+        first_message: str,
+        last_message: str,
+        crisis_detected: bool,
+    ) -> None:
+        """记录 AI 聊天会话到数据库"""
+        if user_id == "anonymous":
+            return
+
+        try:
+            import json
+            from app.models.ai_chat_session import AiChatSession
+            from app.database import SessionLocal
+
+            db = SessionLocal()
+            try:
+                uid = int(user_id)
+                messages = [
+                    {"role": "user", "content": first_message[:2000] if first_message else ""},
+                    {"role": "assistant", "content": last_message[:2000] if last_message else ""},
+                ]
+                session = AiChatSession(
+                    user_id=uid,
+                    title=title[:200],
+                    agent_used=agent_used,
+                    message_count=1,
+                    first_message=first_message[:1000] if first_message else None,
+                    last_message=last_message[:1000] if last_message else None,
+                    crisis_detected=1 if crisis_detected else 0,
+                    messages_json=json.dumps(messages, ensure_ascii=False),
+                )
+                db.add(session)
+                db.commit()
+            finally:
+                db.close()
+        except Exception:
+            pass  # 记录失败不影响主流程
 
     def tools_info(self) -> list[dict]:
         """返回所有工具信息（供调试）"""

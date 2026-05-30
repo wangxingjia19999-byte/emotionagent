@@ -7,6 +7,13 @@
           <span class="chat-header__badge">AI 情绪陪伴</span>
           <h2>慢慢说也没关系</h2>
           <p>有些情绪不需要马上解决，先被看见也很重要。</p>
+          <!-- 查看历史时的返回条 -->
+          <div v-if="activeSessionId !== null" class="history-banner">
+            <span>📋 正在查看历史对话</span>
+            <button class="back-chat-btn" @click="backToCurrentChat">
+              <el-icon><Back /></el-icon> 返回当前对话
+            </button>
+          </div>
         </div>
 
         <!-- 消息列表 -->
@@ -106,36 +113,63 @@
         </div>
       </div>
 
-      <!-- 右侧：工具与状态面板 -->
+      <!-- 右侧：聊天记录 + 小贴士 -->
       <aside class="chat-sidebar">
-        <div class="glass-card sidebar-card">
-          <h3>Agent 状态</h3>
-          <div class="status-row">
-            <span class="status-dot online"></span>
-            <span>情绪分析师在线</span>
+        <!-- 聊天记录 -->
+        <div class="glass-card sidebar-card history-panel">
+          <div class="sidebar-card__header">
+            <h3>💬 聊天记录</h3>
+            <button class="refresh-tips-btn" @click="startNewChat" title="新对话">
+              <el-icon><Plus /></el-icon>
+            </button>
           </div>
-          <div class="status-row">
-            <span class="status-label">模型</span>
-            <span class="status-value">RAG + MCP 增强</span>
+          <div class="history-list" v-if="sessions.length > 0">
+            <div
+              v-for="s in sessions"
+              :key="s.id"
+              class="history-item"
+              :class="{ active: activeSessionId === s.id }"
+              @click="loadSession(s.id)"
+            >
+              <div class="history-item__title">{{ s.title }}</div>
+              <div class="history-item__time">{{ s.created_at }}</div>
+            </div>
           </div>
-          <div class="status-row">
-            <span class="status-label">可用工具</span>
-            <span class="status-value">{{ toolsCount }} 个</span>
+          <div v-else class="history-empty">
+            <p>暂无聊天记录</p>
+            <p class="history-empty__hint">开始和心语聊天吧</p>
           </div>
-          <el-divider />
-          <el-button class="config-link" text @click="$router.push('/agent-config')">
-            <el-icon><Setting /></el-icon>
-            MCP 工具配置
-          </el-button>
         </div>
 
+        <!-- 情绪小贴士卡片 -->
         <div class="glass-card sidebar-card">
-          <h3>情绪小贴士</h3>
+          <div class="sidebar-card__header">
+            <h3>💡 情绪小贴士</h3>
+            <button class="refresh-tips-btn" @click="shuffleTips" title="换一批">
+              <el-icon><Refresh /></el-icon>
+            </button>
+          </div>
           <div class="tips-list">
-            <div class="tip-item" v-for="tip in tips" :key="tip">
-              <el-icon><Sunny /></el-icon>
-              <span>{{ tip }}</span>
+            <div
+              v-for="(tip, i) in displayedTips"
+              :key="i"
+              class="tip-item"
+              :class="'tip-' + tip.category"
+            >
+              <span class="tip-emoji">{{ tip.emoji }}</span>
+              <span>{{ tip.text }}</span>
             </div>
+          </div>
+        </div>
+
+        <!-- 呼吸引导卡片 -->
+        <div class="glass-card sidebar-card breathe-card">
+          <h3>🧘 快速放松</h3>
+          <p class="breathe-sub">跟着节奏深呼吸</p>
+          <div class="breathe-circle" :class="{ inhale: breathePhase === 'in', hold: breathePhase === 'hold', exhale: breathePhase === 'out' }" @click="toggleBreathing">
+            <span v-if="!breathing" class="breathe-start">点我开始</span>
+            <span v-else class="breathe-text">{{ breathePhase === 'in' ? '吸 气' : breathePhase === 'hold' ? '屏 息' : '呼 气' }}</span>
+            <span class="breathe-counter" v-if="breathing">{{ breatheCount }}</span>
           </div>
         </div>
       </aside>
@@ -146,16 +180,15 @@
 <script setup>
 import { ref, nextTick, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { ChatDotRound, MagicStick, Promotion, Setting, Sunny } from '@element-plus/icons-vue'
+import { ChatDotRound, MagicStick, Promotion, Refresh, Plus, Back } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { chatWithMultiAgent, getAgentTools } from '@/api/agent'
+import { chatWithMultiAgent, getChatSessions, getChatSessionDetail } from '@/api/agent'
 
 const router = useRouter()
 const inputText = ref('')
 const messages = ref([])
 const thinking = ref(false)
 const messagesContainer = ref(null)
-const toolsCount = ref(0)
 
 const quickPrompts = [
   '今天心情不太好，能陪我聊聊吗？',
@@ -165,13 +198,160 @@ const quickPrompts = [
   '最近心情有点低落，有什么可以让我开心的东西推荐吗？'
 ]
 
-const tips = [
-  '深呼吸可以帮助平静情绪',
-  '说出你的感受本身就有疗愈效果',
-  '每个人都有情绪低落的时候',
-  '适当的运动能改善情绪状态',
-  '和朋友倾诉可以减轻心理负担'
+// ── 情绪小贴士库（按分类） ──
+const tipBank = [
+  { text: '深呼吸可以帮助平静情绪', category: 'calm', emoji: '🌿' },
+  { text: '说出你的感受本身就有疗愈效果', category: 'calm', emoji: '💬' },
+  { text: '每个人都有情绪低落的时候，这很正常', category: 'calm', emoji: '☁️' },
+  { text: '尝试 4-7-8 呼吸法：吸气4秒，屏息7秒，呼气8秒', category: 'calm', emoji: '🫁' },
+  { text: '闭上眼睛，感受此刻身体与椅子的接触', category: 'calm', emoji: '🧘' },
+  { text: '适当的运动能改善情绪状态', category: 'action', emoji: '🏃' },
+  { text: '和朋友倾诉可以减轻心理负担', category: 'social', emoji: '🤝' },
+  { text: '写日记是整理情绪的好方法', category: 'action', emoji: '📝' },
+  { text: '听一首喜欢的歌，让旋律带走烦恼', category: 'action', emoji: '🎵' },
+  { text: '去户外散步10分钟，阳光和新鲜空气有帮助', category: 'action', emoji: '☀️' },
+  { text: '给自己泡一杯热茶，温暖从手心传到心里', category: 'selfcare', emoji: '🍵' },
+  { text: '洗个热水澡，让身体的放松带动心情', category: 'selfcare', emoji: '🛁' },
+  { text: '允许自己暂时什么都不做，休息也是一种力量', category: 'selfcare', emoji: '🛋️' },
+  { text: '今天做一件让自己开心的小事，哪怕只是吃喜欢的零食', category: 'selfcare', emoji: '🍰' },
+  { text: '你不是一个人，社区里有人懂你的感受', category: 'social', emoji: '💙' },
+  { text: '给别人一个拥抱，也会温暖自己', category: 'social', emoji: '🫂' },
+  { text: '说"不"是保护自己的方式，不需要感到抱歉', category: 'social', emoji: '🛡️' },
+  { text: '情绪像波浪，它会来也会走，你只需要等它过去', category: 'calm', emoji: '🌊' },
+  { text: '关注当下，而不是陷入"如果……怎么办"的漩涡', category: 'calm', emoji: '🎯' },
+  { text: '完成一件小事，比如整理书桌，能带来掌控感', category: 'action', emoji: '✅' },
 ]
+
+const displayedTips = ref([])
+
+function shuffleTips() {
+  const shuffled = [...tipBank].sort(() => Math.random() - 0.5)
+  displayedTips.value = shuffled.slice(0, 5)
+}
+
+// ── 每日一言 ──
+const quotes = [
+  { text: '你不必每天都发光，有时候只是存在着就已经很勇敢了', author: '心语' },
+  { text: '每一个情绪都值得被看见，每一个你都值得被温柔对待', author: '心语' },
+  { text: '裂缝是光照进来的地方，脆弱也是力量的一部分', author: '心语' },
+  { text: '你比自己想象的要坚强，也比自己认为的更值得被爱', author: '心语' },
+  { text: '慢慢来，不用急着变好。允许自己按照自己的节奏成长', author: '心语' },
+  { text: '世界上最温柔的力量，是允许自己不完美', author: '心语' },
+  { text: '今天很难，但你已经走到这里了，这本身就是一种胜利', author: '心语' },
+  { text: '有时候"我还在"比"我很好"更需要勇气说出来', author: '心语' },
+]
+
+const dailyQuote = ref(quotes[Math.floor(Math.random() * quotes.length)])
+
+// ── 呼吸引导 ──
+const breathing = ref(false)
+const breathePhase = ref('in')
+const breatheCount = ref(0)
+let breatheTimer = null
+
+// ── 聊天历史 ──
+const sessions = ref([])
+const activeSessionId = ref(null)
+const savedCurrentMessages = ref([])  // 保存当前对话，切换历史时可恢复
+
+async function loadSessions() {
+  try {
+    const res = await getChatSessions(1, 20)
+    const data = res.data?.data || res.data
+    sessions.value = data?.items || data || []
+  } catch (e) {
+    console.error('加载聊天记录失败:', e)
+    sessions.value = []
+  }
+}
+
+async function loadSession(sessionId) {
+  try {
+    const res = await getChatSessionDetail(sessionId)
+    const detail = res.data?.data || res.data
+    if (!detail || !detail.messages) {
+      console.warn('会话数据为空:', res.data)
+      ElMessage.warning('该会话暂无消息')
+      return
+    }
+
+    // 保存当前对话（如果不在查看历史中）
+    if (activeSessionId.value === null && messages.value.length > 0) {
+      savedCurrentMessages.value = [...messages.value]
+    }
+
+    // 加载历史消息
+    messages.value = detail.messages.map((m, i) => ({
+      role: m.role,
+      content: m.content,
+      time: i === 0 ? (detail.created_at || '') : '',
+    }))
+    activeSessionId.value = sessionId
+    await nextTick()
+    scrollToBottom()
+  } catch (e) {
+    console.error('加载历史消息失败:', e)
+    ElMessage.error('加载历史消息失败')
+  }
+}
+
+function backToCurrentChat() {
+  if (savedCurrentMessages.value.length > 0) {
+    messages.value = [...savedCurrentMessages.value]
+    savedCurrentMessages.value = []
+  }
+  activeSessionId.value = null
+}
+
+function startNewChat() {
+  savedCurrentMessages.value = []
+  messages.value = []
+  activeSessionId.value = null
+  inputText.value = ''
+}
+
+function toggleBreathing() {
+  if (breathing.value) {
+    stopBreathing()
+  } else {
+    startBreathing()
+  }
+}
+
+function startBreathing() {
+  breathing.value = true
+  breatheCount.value = 0
+  breathePhase.value = 'in'
+  runBreatheCycle()
+}
+
+function stopBreathing() {
+  breathing.value = false
+  if (breatheTimer) clearTimeout(breatheTimer)
+  breatheTimer = null
+}
+
+function runBreatheCycle() {
+  if (!breathing.value) return
+  breathePhase.value = 'in'
+  breatheTimer = setTimeout(() => {
+    if (!breathing.value) return
+    breathePhase.value = 'hold'
+    breatheTimer = setTimeout(() => {
+      if (!breathing.value) return
+      breathePhase.value = 'out'
+      breatheTimer = setTimeout(() => {
+        if (!breathing.value) return
+        breatheCount.value++
+        if (breatheCount.value >= 5) {
+          stopBreathing()
+        } else {
+          runBreatheCycle()
+        }
+      }, 6000)
+    }, 2000)
+  }, 4000)
+}
 
 // ── 解析 AI 回复中的商品信息 ──
 function parseProducts(text) {
@@ -241,6 +421,11 @@ async function sendMessage(text) {
   const content = (text || inputText.value).trim()
   if (!content || thinking.value) return
 
+  // 如果在查看历史，先回到当前对话
+  if (activeSessionId.value !== null) {
+    backToCurrentChat()
+  }
+
   messages.value.push({ role: 'user', content, time: getTime() })
   inputText.value = ''
   scrollToBottom()
@@ -279,14 +464,15 @@ async function sendMessage(text) {
   } finally {
     thinking.value = false
     scrollToBottom()
+    // 刷新历史列表，清除当前选中（新消息意味着新会话）
+    activeSessionId.value = null
+    loadSessions()
   }
 }
 
-onMounted(async () => {
-  try {
-    const res = await getAgentTools()
-    toolsCount.value = res.data?.data?.length || res.data?.length || 0
-  } catch { toolsCount.value = 4 }
+onMounted(() => {
+  shuffleTips()
+  loadSessions()
 })
 </script>
 
@@ -353,6 +539,38 @@ onMounted(async () => {
   margin: 4px 0 0;
   font-size: 13px;
   color: #7a8191;
+}
+
+.history-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: #fdf5e6;
+  border: 1px solid #f0d9a0;
+  font-size: 13px;
+  color: #8b6914;
+}
+
+.back-chat-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border: 1px solid #e0c870;
+  border-radius: 8px;
+  background: #fff;
+  color: #7c6ff6;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.back-chat-btn:hover {
+  background: #f0edff;
+  border-color: #7c6ff6;
 }
 
 /* 消息区 */
@@ -582,9 +800,34 @@ onMounted(async () => {
 
 /* 右侧面板 */
 .chat-sidebar {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 18px;
-  align-content: start;
+  height: calc(100vh - 120px);
+  min-height: 560px;
+}
+
+.chat-sidebar > .sidebar-card {
+  flex: none;
+}
+
+.chat-sidebar > .history-panel {
+  flex: 1;
+  min-height: 200px;
+  overflow: hidden;
+}
+
+.sidebar-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.sidebar-card__header h3 {
+  margin: 0;
+  font-size: 15px;
+  color: #2f3142;
 }
 
 .sidebar-card h3 {
@@ -593,62 +836,223 @@ onMounted(async () => {
   color: #2f3142;
 }
 
-.status-row {
+/* 聊天记录面板 */
+.history-panel {
+  flex: 1;
+  min-height: 0;
   display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-  font-size: 13px;
-  color: #5f6475;
+  flex-direction: column;
+  overflow: hidden;
 }
 
-.status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+.history-panel .sidebar-card__header {
   flex: none;
 }
 
-.status-dot.online {
-  background: #43a78d;
-  box-shadow: 0 0 0 3px rgba(67, 167, 141, 0.18);
+.history-list {
+  flex: 1;
+  overflow-y: auto;
+  display: grid;
+  gap: 4px;
+  align-content: start;
 }
 
-.status-label {
-  color: #b0b7c4;
-  min-width: 56px;
+.history-list::-webkit-scrollbar {
+  width: 4px;
 }
 
-.status-value {
-  color: #2f3142;
+.history-list::-webkit-scrollbar-thumb {
+  background: #e0e3f0;
+  border-radius: 99px;
+}
+
+.history-item {
+  padding: 8px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+  border: 1px solid transparent;
+}
+
+.history-item:hover {
+  background: #f8f6ff;
+}
+
+.history-item.active {
+  background: #f0edff;
+  border-color: #d5ceff;
+}
+
+.history-item__title {
+  font-size: 13px;
   font-weight: 500;
+  color: #2f3142;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.config-link {
-  width: 100%;
+.history-item__time {
+  font-size: 11px;
+  color: #b0b7c4;
+  margin-top: 2px;
+}
+
+.history-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
+  color: #b0b7c4;
+  font-size: 13px;
+  gap: 4px;
+}
+
+.history-empty__hint {
+  font-size: 12px;
+  color: #d0d5e0;
+}
+
+.refresh-tips-btn {
+  width: 28px;
+  height: 28px;
+  border: 1px solid #e8ebf3;
+  border-radius: 8px;
+  background: #fff;
   color: #7c6ff6;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: all 0.2s;
+}
+
+.refresh-tips-btn:hover {
+  background: #f0edff;
+  border-color: #7c6ff6;
 }
 
 .tips-list {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .tip-item {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   font-size: 13px;
   color: #5f6475;
-  padding: 8px 12px;
+  padding: 10px 12px;
   border-radius: 12px;
-  background: #fafbfe;
+  line-height: 1.5;
+  transition: transform 0.15s;
 }
 
-.tip-item .el-icon {
-  color: #f0b35b;
+.tip-item:hover {
+  transform: translateX(2px);
+}
+
+.tip-emoji {
+  font-size: 15px;
   flex: none;
+  line-height: 1.4;
+}
+
+.tip-calm { background: #f0f5ff; }
+.tip-action { background: #fff8f0; }
+.tip-social { background: #f5f0ff; }
+.tip-selfcare { background: #f0fff7; }
+
+/* ── 每日一言卡片 ── */
+.daily-quote-card {
+  background: linear-gradient(135deg, #fdf6ff, #faf5ff) !important;
+  border-color: #e8dcf8 !important;
+  text-align: center;
+  padding: 20px 18px !important;
+}
+
+.quote-icon {
+  font-size: 28px;
+  margin-bottom: 10px;
+}
+
+.quote-text {
+  font-size: 13px;
+  color: #5b4a6b;
+  line-height: 1.7;
+  margin: 0 0 8px;
+}
+
+.quote-author {
+  font-size: 12px;
+  color: #b0a0c0;
+  margin: 0;
+}
+
+/* ── 呼吸引导卡片 ── */
+.breathe-card {
+  text-align: center;
+}
+
+.breathe-sub {
+  font-size: 12px;
+  color: #b0b7c4;
+  margin: -8px 0 16px;
+}
+
+.breathe-circle {
+  width: 100px;
+  height: 100px;
+  margin: 0 auto;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: all 0.4s ease;
+  background: #f0edff;
+  border: 3px solid #e0d8ff;
+  position: relative;
+}
+
+.breathe-circle.inhale {
+  transform: scale(1.25);
+  background: #e0d8ff;
+  border-color: #b4a0f0;
+  box-shadow: 0 0 24px rgba(124, 111, 246, 0.2);
+}
+
+.breathe-circle.hold {
+  transform: scale(1.25);
+  background: #e8e0ff;
+  border-color: #c4b0ff;
+}
+
+.breathe-circle.exhale {
+  transform: scale(0.85);
+  background: #f0edff;
+  border-color: #d8d0f0;
+}
+
+.breathe-start {
+  font-size: 13px;
+  color: #7c6ff6;
+  font-weight: 500;
+}
+
+.breathe-text {
+  font-size: 14px;
+  color: #5b4ab0;
+  font-weight: 600;
+  letter-spacing: 2px;
+}
+
+.breathe-counter {
+  position: absolute;
+  bottom: 6px;
+  right: 14px;
+  font-size: 11px;
+  color: #b0a0d0;
 }
 
 /* ── 商品推荐卡片 ── */

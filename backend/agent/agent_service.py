@@ -328,6 +328,427 @@ def get_questionnaire_history(user_id: str, scale_type: str = "", days: int = 30
         db.close()
 
 
+# --- 用户活动与社区工具 ---
+
+
+@tool
+def get_user_activity_overview(user_id: str) -> str:
+    """
+    查看用户在平台上的活动概况，包括：AI聊天次数、发表的帖子数、
+    收藏数、未读私信数、好友数。
+    当首次接触用户、想了解用户的平台参与度、或需要活动背景时调用。
+    user_id 为用户ID（数字字符串）。
+    """
+    from app.database import SessionLocal
+    from sqlalchemy import inspect, text
+
+    db = _get_db_session()
+    try:
+        uid = int(user_id)
+        inspector = inspect(db.get_bind())
+        existing_tables = set(inspector.get_table_names())
+
+        def _find_table(candidates):
+            for t in candidates:
+                if t in existing_tables:
+                    return t
+            return None
+
+        def _find_column(table_name, candidates):
+            columns = {c["name"] for c in inspector.get_columns(table_name)}
+            for c in candidates:
+                if c in columns:
+                    return c
+            return None
+
+        def _count(table_candidates, user_col_candidates, extra_filter="", extra_params=None):
+            table_name = _find_table(table_candidates)
+            if not table_name:
+                return 0
+            user_col = _find_column(table_name, user_col_candidates)
+            if not user_col:
+                return 0
+            sql = f"SELECT COUNT(*) FROM `{table_name}` WHERE `{user_col}` = :uid"
+            params = {"uid": uid}
+            if extra_filter:
+                sql += f" AND ({extra_filter})"
+            if extra_params:
+                params.update(extra_params)
+            try:
+                return int(db.execute(text(sql), params).scalar_one_or_none() or 0)
+            except Exception:
+                return 0
+
+        # AI 聊天次数
+        ai_count = _count(
+            ["ai_chat_sessions", "ai_sessions", "chat_sessions", "conversations", "dialogue_sessions"],
+            ["user_id", "owner_id", "created_by", "uid", "author_id"],
+        )
+
+        # 帖子数
+        post_count = _count(
+            ["posts", "community_posts", "forum_posts"],
+            ["user_id", "owner_id", "created_by", "uid", "author_id"],
+        )
+
+        # 收藏数
+        fav_count = _count(
+            ["favorites", "favorite_posts", "post_favorites", "collections"],
+            ["user_id", "owner_id", "created_by", "uid"],
+        )
+
+        # 好友数
+        friend_count = _count(
+            ["friendships", "friend_relations", "friends", "user_friends"],
+            ["user_id", "owner_id", "created_by", "uid"],
+        )
+
+        # 未读私信数
+        pm_table = _find_table(["private_messages", "messages", "chat_messages", "direct_messages"])
+        unread_count = 0
+        if pm_table:
+            receiver_col = _find_column(pm_table, ["receiver_id", "recipient_id", "to_user_id", "user_id"])
+            if receiver_col:
+                read_col = _find_column(pm_table, ["is_read", "read", "has_read", "read_flag"])
+                if read_col:
+                    sql = (
+                        f"SELECT COUNT(*) FROM `{pm_table}` "
+                        f"WHERE `{receiver_col}` = :uid AND COALESCE(`{read_col}`, 0) = 0"
+                    )
+                    try:
+                        unread_count = int(db.execute(text(sql), {"uid": uid}).scalar_one_or_none() or 0)
+                    except Exception:
+                        unread_count = 0
+
+        parts = ["用户在平台上的活动概况:"]
+        parts.append(f"  AI 聊天次数: {ai_count} 次")
+        parts.append(f"  发表的帖子: {post_count} 篇")
+        parts.append(f"  收藏的帖子: {fav_count} 篇")
+        parts.append(f"  好友数量: {friend_count} 人")
+        parts.append(f"  未读私信: {unread_count} 条")
+
+        if ai_count == 0 and post_count == 0:
+            parts.append("\n提示: 该用户是平台新用户，活动记录较少。可以引导用户开始第一次情绪对话或发表第一篇帖子。")
+        if unread_count > 0:
+            parts.append(f"\n注意: 用户有 {unread_count} 条未读私信，可能错过了社交互动。")
+
+        return "\n".join(parts)
+    finally:
+        db.close()
+
+
+@tool
+def get_my_posts(user_id: str, limit: int = 10) -> str:
+    """
+    查看用户自己发表的帖子列表，了解用户曾分享的内容和当时的心情状态。
+    当用户提到"我的帖子"、"我之前写过"、或需要了解用户的分享历史时调用。
+    user_id: 用户ID（数字字符串）
+    limit: 返回条数，默认10
+    """
+    from app.models.post import Post
+
+    db = _get_db_session()
+    try:
+        uid = int(user_id)
+        posts = (
+            db.query(Post)
+            .filter(Post.user_id == uid, Post.is_deleted == False)
+            .order_by(Post.created_at.desc())
+            .limit(max(1, min(limit, 20)))
+            .all()
+        )
+
+        if not posts:
+            return "你还没有发表过帖子。在社区广场分享你的心情和故事，会得到大家的温暖回应哦～"
+
+        lines = [f"你的帖子 (共展示 {len(posts)} 篇):"]
+        for i, p in enumerate(posts, 1):
+            mood_str = f" | 心情: {p.mood_tag}" if p.mood_tag else ""
+            content_preview = p.content[:150] + "..." if len(p.content) > 150 else p.content
+            time_str = p.created_at.strftime("%m-%d %H:%M") if p.created_at else ""
+            lines.append(
+                f"\n  [{i}] {p.title}{mood_str} | 分类: {p.category}"
+                f"\n      {content_preview}"
+                f"\n      ❤️{p.like_count} 抱抱{p.hug_count} 评论{p.comment_count} | {time_str}"
+            )
+
+        # 分析用户发帖中的情绪模式
+        mood_tags = [p.mood_tag for p in posts if p.mood_tag]
+        if mood_tags:
+            from collections import Counter
+            mood_counter = Counter(mood_tags)
+            top_moods = mood_counter.most_common(3)
+            mood_summary = "、".join(f"{m}({c}次)" for m, c in top_moods)
+            lines.append(f"\n心情标签统计: {mood_summary}")
+
+        return "\n".join(lines)
+    finally:
+        db.close()
+
+
+@tool
+def get_unread_messages(user_id: str) -> str:
+    """
+    查看用户的未读私信情况，包括未读总数和每条未读消息的发送者及内容。
+    当用户提到"消息"、"私信"、"有人找我"、或需要了解未读通知时调用。
+    user_id: 用户ID（数字字符串）
+    """
+    from app.models.friend import PrivateMessage
+    from app.models.user import User
+
+    db = _get_db_session()
+    try:
+        uid = int(user_id)
+        messages = (
+            db.query(PrivateMessage)
+            .filter(
+                PrivateMessage.receiver_id == uid,
+                PrivateMessage.is_read == False,
+            )
+            .order_by(PrivateMessage.created_at.desc())
+            .limit(10)
+            .all()
+        )
+
+        if not messages:
+            return "你没有未读私信。一切安好～"
+
+        # 按发送者分组统计
+        sender_counts = {}
+        for msg in messages:
+            sender = db.query(User).filter(User.id == msg.sender_id).first()
+            sender_name = sender.nickname if sender and sender.nickname else f"用户{msg.sender_id}"
+            if sender_name not in sender_counts:
+                sender_counts[sender_name] = {"count": 0, "latest": msg}
+            sender_counts[sender_name]["count"] += 1
+
+        lines = [f"你有 {len(messages)} 条未读私信:"]
+        for sender_name, info in sender_counts.items():
+            latest = info["latest"]
+            content_preview = latest.content[:80] + "..." if len(latest.content) > 80 else latest.content
+            time_str = latest.created_at.strftime("%m-%d %H:%M") if latest.created_at else ""
+            lines.append(
+                f"\n  来自 {sender_name} ({info['count']}条未读)"
+                f"\n  最新: {content_preview}"
+                f"\n  时间: {time_str}"
+            )
+
+        lines.append("\n提示: 有人关心和陪伴是很温暖的事，记得去看看哦～")
+        return "\n".join(lines)
+    finally:
+        db.close()
+
+
+@tool
+def get_community_square_posts(
+    keyword: str = "",
+    mood_tag: str = "",
+    category: str = "",
+    sort: str = "latest",
+    limit: int = 10,
+) -> str:
+    """
+    查看社区广场的帖子，了解社区中其他用户的分享和情绪状态。
+    这是核心的社区广场内容获取工具，用于分析社区集体情绪氛围。
+
+    使用场景：
+    - 用户问"社区最近怎么样"、"大家都在聊什么"
+    - 需要了解特定情绪（如"焦虑"、"难过"）的用户在社区中分享了什么
+    - 分析社区中某个分类（情绪倾诉/学习生活/人际关系等）的讨论
+    - 作为分析用户所在社区情绪氛围的上下文
+
+    keyword: 搜索关键词（在标题和内容中搜索），留空则不搜索
+    mood_tag: 心情标签筛选（如 焦虑/难过/开心/愤怒/孤独/温暖/平静），留空则不筛选
+    category: 分类筛选（情绪倾诉/学习生活/人际关系/校园日常/其他），留空则不筛选
+    sort: 排序方式，latest=最新, hot=最热（点赞+评论+浏览）
+    limit: 返回条数，默认10，最大20
+    """
+    from app.models.post import Post
+    from app.models.user import User
+
+    db = _get_db_session()
+    try:
+        q = db.query(Post).filter(Post.is_deleted == False)
+
+        if keyword:
+            q = q.filter(
+                (Post.title.contains(keyword)) | (Post.content.contains(keyword))
+            )
+        if mood_tag:
+            q = q.filter(Post.mood_tag == mood_tag)
+        if category:
+            q = q.filter(Post.category == category)
+
+        if sort == "hot":
+            q = q.order_by(
+                (Post.like_count + Post.comment_count + Post.view_count).desc(),
+                Post.created_at.desc(),
+            )
+        else:
+            q = q.order_by(Post.created_at.desc())
+
+        posts = q.limit(max(1, min(limit, 20))).all()
+
+        if not posts:
+            filter_desc = []
+            if mood_tag:
+                filter_desc.append(f"心情「{mood_tag}」")
+            if category:
+                filter_desc.append(f"分类「{category}」")
+            if keyword:
+                filter_desc.append(f"关键词「{keyword}」")
+            desc = "、".join(filter_desc) if filter_desc else "广场"
+            return f"{desc}下暂无帖子。社区需要你的第一次分享～"
+
+        # 收集心情标签分布
+        mood_dist = {}
+        for p in posts:
+            if p.mood_tag:
+                mood_dist[p.mood_tag] = mood_dist.get(p.mood_tag, 0) + 1
+
+        filter_desc_parts = []
+        if mood_tag:
+            filter_desc_parts.append(f"心情「{mood_tag}」")
+        if category:
+            filter_desc_parts.append(f"分类「{category}」")
+        if keyword:
+            filter_desc_parts.append(f"搜索「{keyword}」")
+        header = f"社区广场{' - ' + '、'.join(filter_desc_parts) if filter_desc_parts else ''} 帖子 (共展示 {len(posts)} 篇):"
+
+        lines = [header]
+
+        # 心情氛围概览
+        if mood_dist:
+            mood_lines = []
+            for m, c in sorted(mood_dist.items(), key=lambda x: x[1], reverse=True):
+                mood_lines.append(f"{m}({c}篇)")
+            lines.append(f"心情分布: {', '.join(mood_lines[:5])}")
+            lines.append("")
+
+        for i, p in enumerate(posts, 1):
+            # 获取作者昵称
+            author = db.query(User).filter(User.id == p.user_id).first()
+            author_name = author.nickname if author and author.nickname else "匿名用户"
+            mood_str = f" | 心情: {p.mood_tag}" if p.mood_tag else ""
+            content_preview = p.content[:150] + "..." if len(p.content) > 150 else p.content
+            time_str = p.created_at.strftime("%m-%d %H:%M") if p.created_at else ""
+
+            lines.append(
+                f"  [{i}] {p.title}{mood_str} | 分类: {p.category}"
+                f"\n      作者: {author_name}"
+                f"\n      {content_preview}"
+                f"\n      ❤️{p.like_count} 抱抱{p.hug_count} 评论{p.comment_count} 浏览{p.view_count} | {time_str}"
+            )
+
+        # 社区情绪分析
+        if mood_dist:
+            total = sum(mood_dist.values())
+            negative_moods = {"难过", "焦虑", "愤怒", "孤独", "恐惧", "低落"}
+            negative_count = sum(c for m, c in mood_dist.items() if m in negative_moods)
+            negative_ratio = negative_count / total if total > 0 else 0
+
+            lines.append("\n--- 社区情绪分析 ---")
+            if negative_ratio >= 0.5:
+                lines.append(
+                    f"注意: 当前展示的帖子中，负面情绪占比 {negative_ratio:.0%}，"
+                    f"社区中较多用户正在经历困难情绪，需要更多的温暖和共情。"
+                )
+            elif negative_ratio >= 0.3:
+                lines.append(
+                    f"当前展示的帖子中，负面情绪占比 {negative_ratio:.0%}，"
+                    f"社区情绪整体偏中性，有部分用户需要关注。"
+                )
+            else:
+                lines.append(
+                    f"当前展示的帖子中，负面情绪占比 {negative_ratio:.0%}，"
+                    f"社区氛围整体偏积极温暖。"
+                )
+
+        return "\n".join(lines)
+    finally:
+        db.close()
+
+
+@tool
+def publish_community_post(
+    user_id: str,
+    title: str,
+    content: str,
+    mood_tag: str = "",
+    category: str = "情绪倾诉",
+    is_anonymous: bool = False,
+) -> str:
+    """
+    帮用户在社区广场发布一篇帖子。当用户在倾诉中表达了强烈的情绪，
+    或 agent 判断发布到社区可以获得更多温暖回应和支持时，可以主动提议使用此工具。
+
+    使用场景：
+    - 用户心情低落，agent 帮ta整理心情并发帖寻求社区支持
+    - 用户表达了想分享的意愿，agent 代为撰写并发布
+    - 作为情绪安抚策略：将内心的感受写出来、发出去，获得社区回应
+
+    重要：使用前应先告知用户，获得许可后再发布。不要擅自代发。
+
+    user_id: 用户ID（数字字符串）
+    title: 帖子标题（1-100字）
+    content: 帖子正文内容
+    mood_tag: 心情标签（开心/难过/焦虑/愤怒/温暖/平静/孤独/恐惧/惊讶/感激）
+    category: 分类（情绪倾诉/学习生活/人际关系/校园日常/其他），默认"情绪倾诉"
+    is_anonymous: 是否匿名发布，默认False
+    """
+    from app.models.post import Post
+
+    db = _get_db_session()
+    try:
+        uid = int(user_id)
+
+        # 验证标题和内容
+        title = title.strip()
+        content = content.strip()
+        if not title or len(title) > 100:
+            return "发帖失败：标题需 1-100 个字符。"
+        if not content:
+            return "发帖失败：内容不能为空。"
+
+        # 验证分类
+        allowed_categories = {"情绪倾诉", "学习生活", "人际关系", "校园日常", "其他"}
+        if category not in allowed_categories:
+            category = "情绪倾诉"
+
+        # 验证心情标签
+        allowed_moods = {"开心", "难过", "焦虑", "愤怒", "温暖", "平静", "孤独", "恐惧", "惊讶", "感激"}
+        if mood_tag and mood_tag not in allowed_moods:
+            mood_tag = ""
+
+        post = Post(
+            user_id=uid,
+            title=title[:100],
+            content=content,
+            category=category,
+            mood_tag=mood_tag if mood_tag else None,
+            is_anonymous=is_anonymous,
+        )
+        db.add(post)
+        db.commit()
+        db.refresh(post)
+
+        anonymous_note = "（匿名发布）" if is_anonymous else ""
+        mood_note = f" | 心情: {mood_tag}" if mood_tag else ""
+        result = (
+            f"帖子发布成功！{anonymous_note}\n"
+            f"  标题: {post.title}{mood_note}\n"
+            f"  分类: {post.category}\n"
+            f"  帖子ID: {post.id}\n"
+            f"\n你的心情已经分享到社区广场了，相信会有温暖的人来回应你 💙"
+        )
+        return result
+    except Exception as e:
+        db.rollback()
+        return f"发帖失败: {str(e)}"
+    finally:
+        db.close()
+
+
 # --- 商城与推荐工具 ---
 
 

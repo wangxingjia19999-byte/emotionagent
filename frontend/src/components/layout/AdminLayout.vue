@@ -109,6 +109,12 @@ const navGroups = [
     ],
   },
   {
+    label: 'AI 管理',
+    items: [
+      { path: '/admin/agent-config', label: 'Agent 配置', icon: '🤖' },
+    ],
+  },
+  {
     label: '系统',
     items: [
       { path: '/admin/audit-logs', label: '审计日志', icon: '◷' },
@@ -129,6 +135,7 @@ const pageTitleMap = {
   '/admin/crisis-alerts': '危机预警',
   '/admin/audit-logs': '审计日志',
   '/admin/stats': '数据统计',
+  '/admin/agent-config': 'Agent 配置',
 }
 
 const pageTitle = computed(() => {
