@@ -1,0 +1,71 @@
+// ── 主题色 ───────────────────────────────────
+$primary-color: #7c6ff6;
+$primary-light: rgba(124, 111, 246, 0.1);
+$primary-dark: #5b4fd9;
+$primary-gradient: linear-gradient(135deg, #7c6ff6 0%, #a78bfa 100%);
+
+// ── 文字颜色 ─────────────────────────────────
+$text-primary: #2f3142;
+$text-secondary: #5f6475;
+$text-muted: #8a8fa3;
+$text-placeholder: #b8bcc9;
+
+// ── 背景色 ───────────────────────────────────
+$bg-page: #f7f8fc;
+$bg-card: #ffffff;
+$bg-hover: #f3f4f8;
+
+// ── 边框 ─────────────────────────────────────
+$border-color: #e8e9f0;
+$border-light: #f0f0f5;
+
+// ── 圆角 ─────────────────────────────────────
+$radius-sm: 8rpx;
+$radius-md: 12rpx;
+$radius-lg: 16rpx;
+$radius-xl: 22rpx;
+$radius-round: 50%;
+
+// ── 阴影 ─────────────────────────────────────
+$shadow-sm: 0 2rpx 8rpx rgba(44, 52, 73, 0.04);
+$shadow-md: 0 4rpx 16rpx rgba(44, 52, 73, 0.08);
+$shadow-lg: 0 8rpx 32rpx rgba(44, 52, 73, 0.12);
+
+// ── 间距 ─────────────────────────────────────
+$spacing-xs: 8rpx;
+$spacing-sm: 12rpx;
+$spacing-md: 16rpx;
+$spacing-lg: 24rpx;
+$spacing-xl: 32rpx;
+$spacing-xxl: 48rpx;
+
+// ── 字号 ─────────────────────────────────────
+$font-xs: 20rpx;
+$font-sm: 24rpx;
+$font-md: 28rpx;
+$font-lg: 32rpx;
+$font-xl: 36rpx;
+$font-xxl: 44rpx;
+
+// ── 安全区 ───────────────────────────────────
+$safe-bottom: env(safe-area-inset-bottom);
+
+// ── 状态色 ───────────────────────────────────
+$success-color: #52c41a;
+$warning-color: #faad14;
+$error-color: #ff4d4f;
+$info-color: #1890ff;
+
+// ── 情绪标签色 ───────────────────────────────
+$emotion-colors: (
+  '开心': #ff9500,
+  '难过': #5b9cf5,
+  '焦虑': #ff6b6b,
+  '愤怒': #e74c3c,
+  '温暖': #ff9f43,
+  '平静': #6ec6a0,
+  '孤独': #95a5a6,
+  '恐惧': #9b59b6,
+  '惊讶': #f39c12,
+  '感激': #2ecc71,
+);

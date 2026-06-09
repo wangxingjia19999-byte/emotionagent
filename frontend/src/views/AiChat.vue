@@ -1,17 +1,72 @@
 <template>
   <div class="ai-chat-page">
     <div class="chat-layout">
-      <!-- 左侧：对话区 -->
+      <!-- 对话区（全宽） -->
       <div class="chat-main glass-card">
+        <!-- 头部：标题 + 操作按钮 -->
         <div class="chat-header">
-          <span class="chat-header__badge">AI 情绪陪伴</span>
-          <h2>慢慢说也没关系</h2>
-          <p>有些情绪不需要马上解决，先被看见也很重要。</p>
-          <!-- 查看历史时的返回条 -->
+          <div class="chat-header__top">
+            <div class="chat-header__info">
+              <span class="chat-header__badge">AI 情绪陪伴</span>
+              <h2>慢慢说也没关系</h2>
+              <p>有些情绪不需要马上解决，先被看见也很重要。</p>
+            </div>
+            <div class="chat-header__actions">
+              <button class="header-btn new-chat-btn" @click="startNewChat">
+                <el-icon :size="16"><Plus /></el-icon>
+                <span>新建会话</span>
+              </button>
+              <div class="history-dropdown-wrapper" ref="historyDropdownRef">
+                <button
+                  class="header-btn history-btn"
+                  :class="{ active: showHistoryPanel }"
+                  @click="toggleHistoryPanel"
+                >
+                  <el-icon :size="16"><Clock /></el-icon>
+                  <span>历史会话</span>
+                  <span v-if="sessions.length" class="history-count">{{ sessions.length }}</span>
+                </button>
+                <!-- 下拉面板 -->
+                <Transition name="dropdown-fade">
+                  <div v-if="showHistoryPanel" class="history-dropdown">
+                    <div class="history-dropdown__header">
+                      <h4>历史会话</h4>
+                      <span class="history-dropdown__count">{{ sessions.length }} 个会话</span>
+                    </div>
+                    <div class="history-dropdown__list" v-if="sessions.length > 0">
+                      <div
+                        v-for="s in sessions"
+                        :key="s.id"
+                        class="history-dropdown-item"
+                        :class="{ active: activeSessionId === s.id }"
+                        @click="loadSession(s.id); showHistoryPanel = false"
+                      >
+                        <div class="history-dropdown-item__icon">
+                          <el-icon :size="16"><ChatDotRound /></el-icon>
+                        </div>
+                        <div class="history-dropdown-item__info">
+                          <div class="history-dropdown-item__title">{{ s.title }}</div>
+                          <div class="history-dropdown-item__time">{{ formatSessionTime(s.created_at) }}</div>
+                        </div>
+                        <div v-if="activeSessionId === s.id" class="history-dropdown-item__badge">当前</div>
+                      </div>
+                    </div>
+                    <div v-else class="history-dropdown__empty">
+                      <el-icon :size="32"><ChatDotRound /></el-icon>
+                      <p>暂无历史会话</p>
+                      <span>开始和心语聊天吧</span>
+                    </div>
+                  </div>
+                </Transition>
+              </div>
+            </div>
+          </div>
+          <!-- 查看历史时显示返回条 -->
           <div v-if="activeSessionId !== null" class="history-banner">
-            <span>📋 正在查看历史对话</span>
+            <span>📋 正在查看历史会话</span>
             <button class="back-chat-btn" @click="backToCurrentChat">
-              <el-icon><Back /></el-icon> 返回当前对话
+              <el-icon :size="14"><Back /></el-icon>
+              返回当前对话
             </button>
           </div>
         </div>
@@ -112,75 +167,14 @@
           <p class="chat-disclaimer">AI 陪伴仅供参考，紧急情况请拨打心理援助热线 400-161-9995</p>
         </div>
       </div>
-
-      <!-- 右侧：聊天记录 + 小贴士 -->
-      <aside class="chat-sidebar">
-        <!-- 聊天记录 -->
-        <div class="glass-card sidebar-card history-panel">
-          <div class="sidebar-card__header">
-            <h3>💬 聊天记录</h3>
-            <button class="refresh-tips-btn" @click="startNewChat" title="新对话">
-              <el-icon><Plus /></el-icon>
-            </button>
-          </div>
-          <div class="history-list" v-if="sessions.length > 0">
-            <div
-              v-for="s in sessions"
-              :key="s.id"
-              class="history-item"
-              :class="{ active: activeSessionId === s.id }"
-              @click="loadSession(s.id)"
-            >
-              <div class="history-item__title">{{ s.title }}</div>
-              <div class="history-item__time">{{ s.created_at }}</div>
-            </div>
-          </div>
-          <div v-else class="history-empty">
-            <p>暂无聊天记录</p>
-            <p class="history-empty__hint">开始和心语聊天吧</p>
-          </div>
-        </div>
-
-        <!-- 情绪小贴士卡片 -->
-        <div class="glass-card sidebar-card">
-          <div class="sidebar-card__header">
-            <h3>💡 情绪小贴士</h3>
-            <button class="refresh-tips-btn" @click="shuffleTips" title="换一批">
-              <el-icon><Refresh /></el-icon>
-            </button>
-          </div>
-          <div class="tips-list">
-            <div
-              v-for="(tip, i) in displayedTips"
-              :key="i"
-              class="tip-item"
-              :class="'tip-' + tip.category"
-            >
-              <span class="tip-emoji">{{ tip.emoji }}</span>
-              <span>{{ tip.text }}</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- 呼吸引导卡片 -->
-        <div class="glass-card sidebar-card breathe-card">
-          <h3>🧘 快速放松</h3>
-          <p class="breathe-sub">跟着节奏深呼吸</p>
-          <div class="breathe-circle" :class="{ inhale: breathePhase === 'in', hold: breathePhase === 'hold', exhale: breathePhase === 'out' }" @click="toggleBreathing">
-            <span v-if="!breathing" class="breathe-start">点我开始</span>
-            <span v-else class="breathe-text">{{ breathePhase === 'in' ? '吸 气' : breathePhase === 'hold' ? '屏 息' : '呼 气' }}</span>
-            <span class="breathe-counter" v-if="breathing">{{ breatheCount }}</span>
-          </div>
-        </div>
-      </aside>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, nextTick, onMounted, computed } from 'vue'
+import { ref, nextTick, onMounted, onUnmounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { ChatDotRound, MagicStick, Promotion, Refresh, Plus, Back } from '@element-plus/icons-vue'
+import { ChatDotRound, MagicStick, Promotion, Plus, Clock, Back } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { chatWithMultiAgent, getChatSessions, getChatSessionDetail } from '@/api/agent'
 
@@ -189,6 +183,8 @@ const inputText = ref('')
 const messages = ref([])
 const thinking = ref(false)
 const messagesContainer = ref(null)
+const showHistoryPanel = ref(false)
+const historyDropdownRef = ref(null)
 
 const quickPrompts = [
   '今天心情不太好，能陪我聊聊吗？',
@@ -308,6 +304,34 @@ function startNewChat() {
   messages.value = []
   activeSessionId.value = null
   inputText.value = ''
+  showHistoryPanel.value = false
+}
+
+function toggleHistoryPanel() {
+  showHistoryPanel.value = !showHistoryPanel.value
+}
+
+function handleClickOutside(e) {
+  if (historyDropdownRef.value && !historyDropdownRef.value.contains(e.target)) {
+    showHistoryPanel.value = false
+  }
+}
+
+function formatSessionTime(dateStr) {
+  if (!dateStr) return ''
+  try {
+    const d = new Date(dateStr)
+    const now = new Date()
+    const diffMs = now - d
+    const diffMin = Math.floor(diffMs / 60000)
+    const diffHour = Math.floor(diffMs / 3600000)
+    const diffDay = Math.floor(diffMs / 86400000)
+    if (diffMin < 1) return '刚刚'
+    if (diffMin < 60) return `${diffMin} 分钟前`
+    if (diffHour < 24) return `${diffHour} 小时前`
+    if (diffDay < 7) return `${diffDay} 天前`
+    return d.toLocaleDateString('zh-CN')
+  } catch { return dateStr }
 }
 
 function toggleBreathing() {
@@ -473,6 +497,11 @@ async function sendMessage(text) {
 onMounted(() => {
   shuffleTips()
   loadSessions()
+  document.addEventListener('click', handleClickOutside)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutside)
 })
 </script>
 
@@ -483,16 +512,8 @@ onMounted(() => {
 }
 
 .chat-layout {
-  display: grid;
-  grid-template-columns: 1fr 280px;
-  gap: 20px;
-  align-items: start;
-}
-
-@media (max-width: 900px) {
-  .chat-layout {
-    grid-template-columns: 1fr;
-  }
+  max-width: 880px;
+  margin: 0 auto;
 }
 
 .glass-card {
@@ -516,6 +537,234 @@ onMounted(() => {
 .chat-header {
   padding: 20px 24px 16px;
   border-bottom: 1px solid #f0f1f6;
+}
+
+.chat-header__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.chat-header__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.chat-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
+.header-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid #e8ebf3;
+  border-radius: 10px;
+  background: #fff;
+  color: #5f6475;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.header-btn:hover {
+  background: #f8f6ff;
+  border-color: #cbc0ff;
+  color: #7c6ff6;
+}
+
+.header-btn.active {
+  background: #f0edff;
+  border-color: #7c6ff6;
+  color: #7c6ff6;
+}
+
+.new-chat-btn {
+  background: linear-gradient(135deg, #7c6ff6, #9b8eff);
+  border-color: transparent;
+  color: #fff;
+}
+
+.new-chat-btn:hover {
+  background: linear-gradient(135deg, #6b5fd4, #8b7ef0);
+  border-color: transparent;
+  color: #fff;
+}
+
+.history-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 99px;
+  background: #f0edff;
+  color: #7c6ff6;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.history-btn.active .history-count {
+  background: #7c6ff6;
+  color: #fff;
+}
+
+/* 历史会话下拉面板 */
+.history-dropdown-wrapper {
+  position: relative;
+}
+
+.history-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 340px;
+  max-height: 420px;
+  background: #fff;
+  border: 1px solid #e8ebf3;
+  border-radius: 16px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.12), 0 4px 12px rgba(0, 0, 0, 0.06);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.history-dropdown__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid #f0f1f6;
+  flex: none;
+}
+
+.history-dropdown__header h4 {
+  margin: 0;
+  font-size: 15px;
+  color: #2f3142;
+}
+
+.history-dropdown__count {
+  font-size: 12px;
+  color: #b0b7c4;
+}
+
+.history-dropdown__list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.history-dropdown__list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.history-dropdown__list::-webkit-scrollbar-thumb {
+  background: #e0e3f0;
+  border-radius: 99px;
+}
+
+.history-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.history-dropdown-item:hover {
+  background: #f8f6ff;
+}
+
+.history-dropdown-item.active {
+  background: #f0edff;
+}
+
+.history-dropdown-item__icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: #f0edff;
+  display: grid;
+  place-items: center;
+  color: #7c6ff6;
+  flex: none;
+}
+
+.history-dropdown-item.active .history-dropdown-item__icon {
+  background: #e0d8ff;
+}
+
+.history-dropdown-item__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.history-dropdown-item__title {
+  font-size: 13px;
+  font-weight: 500;
+  color: #2f3142;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.history-dropdown-item__time {
+  font-size: 11px;
+  color: #b0b7c4;
+  margin-top: 2px;
+}
+
+.history-dropdown-item__badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: #7c6ff6;
+  color: #fff;
+  flex: none;
+}
+
+.history-dropdown__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 20px;
+  color: #b0b7c4;
+  gap: 6px;
+}
+
+.history-dropdown__empty p {
+  margin: 0;
+  font-size: 14px;
+  color: #7a8191;
+}
+
+.history-dropdown__empty span {
+  font-size: 12px;
+}
+
+/* 下拉面板过渡动画 */
+.dropdown-fade-enter-active,
+.dropdown-fade-leave-active {
+  transition: all 0.2s ease;
+}
+
+.dropdown-fade-enter-from,
+.dropdown-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
 }
 
 .chat-header__badge {
@@ -796,263 +1045,6 @@ onMounted(() => {
   font-size: 11px;
   color: #c0c6d4;
   text-align: center;
-}
-
-/* 右侧面板 */
-.chat-sidebar {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  height: calc(100vh - 120px);
-  min-height: 560px;
-}
-
-.chat-sidebar > .sidebar-card {
-  flex: none;
-}
-
-.chat-sidebar > .history-panel {
-  flex: 1;
-  min-height: 200px;
-  overflow: hidden;
-}
-
-.sidebar-card__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 14px;
-}
-
-.sidebar-card__header h3 {
-  margin: 0;
-  font-size: 15px;
-  color: #2f3142;
-}
-
-.sidebar-card h3 {
-  margin: 0 0 14px;
-  font-size: 15px;
-  color: #2f3142;
-}
-
-/* 聊天记录面板 */
-.history-panel {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.history-panel .sidebar-card__header {
-  flex: none;
-}
-
-.history-list {
-  flex: 1;
-  overflow-y: auto;
-  display: grid;
-  gap: 4px;
-  align-content: start;
-}
-
-.history-list::-webkit-scrollbar {
-  width: 4px;
-}
-
-.history-list::-webkit-scrollbar-thumb {
-  background: #e0e3f0;
-  border-radius: 99px;
-}
-
-.history-item {
-  padding: 8px 10px;
-  border-radius: 10px;
-  cursor: pointer;
-  transition: all 0.15s;
-  border: 1px solid transparent;
-}
-
-.history-item:hover {
-  background: #f8f6ff;
-}
-
-.history-item.active {
-  background: #f0edff;
-  border-color: #d5ceff;
-}
-
-.history-item__title {
-  font-size: 13px;
-  font-weight: 500;
-  color: #2f3142;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.history-item__time {
-  font-size: 11px;
-  color: #b0b7c4;
-  margin-top: 2px;
-}
-
-.history-empty {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  color: #b0b7c4;
-  font-size: 13px;
-  gap: 4px;
-}
-
-.history-empty__hint {
-  font-size: 12px;
-  color: #d0d5e0;
-}
-
-.refresh-tips-btn {
-  width: 28px;
-  height: 28px;
-  border: 1px solid #e8ebf3;
-  border-radius: 8px;
-  background: #fff;
-  color: #7c6ff6;
-  cursor: pointer;
-  display: grid;
-  place-items: center;
-  transition: all 0.2s;
-}
-
-.refresh-tips-btn:hover {
-  background: #f0edff;
-  border-color: #7c6ff6;
-}
-
-.tips-list {
-  display: grid;
-  gap: 8px;
-}
-
-.tip-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  font-size: 13px;
-  color: #5f6475;
-  padding: 10px 12px;
-  border-radius: 12px;
-  line-height: 1.5;
-  transition: transform 0.15s;
-}
-
-.tip-item:hover {
-  transform: translateX(2px);
-}
-
-.tip-emoji {
-  font-size: 15px;
-  flex: none;
-  line-height: 1.4;
-}
-
-.tip-calm { background: #f0f5ff; }
-.tip-action { background: #fff8f0; }
-.tip-social { background: #f5f0ff; }
-.tip-selfcare { background: #f0fff7; }
-
-/* ── 每日一言卡片 ── */
-.daily-quote-card {
-  background: linear-gradient(135deg, #fdf6ff, #faf5ff) !important;
-  border-color: #e8dcf8 !important;
-  text-align: center;
-  padding: 20px 18px !important;
-}
-
-.quote-icon {
-  font-size: 28px;
-  margin-bottom: 10px;
-}
-
-.quote-text {
-  font-size: 13px;
-  color: #5b4a6b;
-  line-height: 1.7;
-  margin: 0 0 8px;
-}
-
-.quote-author {
-  font-size: 12px;
-  color: #b0a0c0;
-  margin: 0;
-}
-
-/* ── 呼吸引导卡片 ── */
-.breathe-card {
-  text-align: center;
-}
-
-.breathe-sub {
-  font-size: 12px;
-  color: #b0b7c4;
-  margin: -8px 0 16px;
-}
-
-.breathe-circle {
-  width: 100px;
-  height: 100px;
-  margin: 0 auto;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  transition: all 0.4s ease;
-  background: #f0edff;
-  border: 3px solid #e0d8ff;
-  position: relative;
-}
-
-.breathe-circle.inhale {
-  transform: scale(1.25);
-  background: #e0d8ff;
-  border-color: #b4a0f0;
-  box-shadow: 0 0 24px rgba(124, 111, 246, 0.2);
-}
-
-.breathe-circle.hold {
-  transform: scale(1.25);
-  background: #e8e0ff;
-  border-color: #c4b0ff;
-}
-
-.breathe-circle.exhale {
-  transform: scale(0.85);
-  background: #f0edff;
-  border-color: #d8d0f0;
-}
-
-.breathe-start {
-  font-size: 13px;
-  color: #7c6ff6;
-  font-weight: 500;
-}
-
-.breathe-text {
-  font-size: 14px;
-  color: #5b4ab0;
-  font-weight: 600;
-  letter-spacing: 2px;
-}
-
-.breathe-counter {
-  position: absolute;
-  bottom: 6px;
-  right: 14px;
-  font-size: 11px;
-  color: #b0a0d0;
 }
 
 /* ── 商品推荐卡片 ── */

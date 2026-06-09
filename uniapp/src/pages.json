@@ -1,0 +1,178 @@
+{
+  "easycom": {
+    "autoscan": true,
+    "custom": {
+      "^uni-(.*)": "@dcloudio/uni-ui/lib/uni-$1/uni-$1.vue"
+    }
+  },
+  "pages": [
+    {
+      "path": "pages/tabbar/home/index",
+      "style": {
+        "navigationBarTitleText": "心语陪伴",
+        "navigationBarBackgroundColor": "#ffffff",
+        "navigationBarTextStyle": "black"
+      }
+    },
+    {
+      "path": "pages/tabbar/community/index",
+      "style": {
+        "navigationBarTitleText": "社区广场",
+        "navigationBarBackgroundColor": "#ffffff",
+        "navigationBarTextStyle": "black",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/tabbar/chat/index",
+      "style": {
+        "navigationBarTitleText": "AI 情绪陪伴",
+        "navigationBarBackgroundColor": "#ffffff",
+        "navigationBarTextStyle": "black"
+      }
+    },
+    {
+      "path": "pages/tabbar/profile/index",
+      "style": {
+        "navigationBarTitleText": "我的",
+        "navigationBarBackgroundColor": "#ffffff",
+        "navigationBarTextStyle": "black"
+      }
+    },
+    {
+      "path": "pages/auth/login",
+      "style": {
+        "navigationBarTitleText": "登录",
+        "navigationBarBackgroundColor": "#ffffff",
+        "navigationBarTextStyle": "black"
+      }
+    },
+    {
+      "path": "pages/auth/register",
+      "style": {
+        "navigationBarTitleText": "注册",
+        "navigationBarBackgroundColor": "#ffffff",
+        "navigationBarTextStyle": "black"
+      }
+    },
+    {
+      "path": "pages/auth/admin-login",
+      "style": {
+        "navigationBarTitleText": "管理后台登录",
+        "navigationBarBackgroundColor": "#ffffff",
+        "navigationBarTextStyle": "black"
+      }
+    }
+  ],
+  "subPackages": [
+    {
+      "root": "pages/subpackages/posts",
+      "pages": [
+        { "path": "detail", "style": { "navigationBarTitleText": "帖子详情" } },
+        { "path": "publish", "style": { "navigationBarTitleText": "发布帖子" } }
+      ]
+    },
+    {
+      "root": "pages/subpackages/friends",
+      "pages": [
+        { "path": "list", "style": { "navigationBarTitleText": "好友" } },
+        { "path": "private-chat", "style": { "navigationBarTitleText": "私聊" } }
+      ]
+    },
+    {
+      "root": "pages/subpackages/questionnaire",
+      "pages": [
+        { "path": "daily-check", "style": { "navigationBarTitleText": "每日情绪打卡" } }
+      ]
+    },
+    {
+      "root": "pages/subpackages/shop",
+      "pages": [
+        { "path": "index", "style": { "navigationBarTitleText": "解压商城" } },
+        { "path": "product", "style": { "navigationBarTitleText": "商品详情" } },
+        { "path": "cart", "style": { "navigationBarTitleText": "购物车" } },
+        { "path": "orders", "style": { "navigationBarTitleText": "我的订单" } }
+      ]
+    },
+    {
+      "root": "pages/subpackages/user",
+      "pages": [
+        { "path": "user-profile", "style": { "navigationBarTitleText": "用户主页" } }
+      ]
+    },
+    {
+      "root": "pages/subpackages/admin",
+      "pages": [
+        { "path": "dashboard", "style": { "navigationBarTitleText": "管理后台" } },
+        { "path": "products", "style": { "navigationBarTitleText": "商品管理" } },
+        { "path": "categories", "style": { "navigationBarTitleText": "分类管理" } },
+        { "path": "orders", "style": { "navigationBarTitleText": "订单管理" } },
+        { "path": "users", "style": { "navigationBarTitleText": "用户管理" } },
+        { "path": "questionnaires", "style": { "navigationBarTitleText": "问卷管理" } },
+        { "path": "emotion-logs", "style": { "navigationBarTitleText": "情绪日志" } },
+        { "path": "posts", "style": { "navigationBarTitleText": "帖子管理" } },
+        { "path": "admins", "style": { "navigationBarTitleText": "管理员管理" } },
+        { "path": "crisis-alerts", "style": { "navigationBarTitleText": "危机预警" } },
+        { "path": "audit-logs", "style": { "navigationBarTitleText": "审计日志" } },
+        { "path": "stats", "style": { "navigationBarTitleText": "统计分析" } },
+        { "path": "agent-config", "style": { "navigationBarTitleText": "Agent 配置" } }
+      ]
+    }
+  ],
+  "preloadRule": {
+    "pages/tabbar/home/index": {
+      "network": "all",
+      "packages": ["pages/subpackages/questionnaire", "pages/subpackages/shop"]
+    },
+    "pages/tabbar/community/index": {
+      "network": "all",
+      "packages": ["pages/subpackages/posts"]
+    },
+    "pages/tabbar/chat/index": {
+      "network": "all",
+      "packages": ["pages/subpackages/shop"]
+    },
+    "pages/tabbar/profile/index": {
+      "network": "all",
+      "packages": ["pages/subpackages/friends", "pages/subpackages/shop"]
+    }
+  },
+  "tabBar": {
+    "color": "#8a8fa3",
+    "selectedColor": "#7c6ff6",
+    "borderStyle": "black",
+    "backgroundColor": "#ffffff",
+    "list": [
+      {
+        "pagePath": "pages/tabbar/home/index",
+        "text": "首页",
+        "iconPath": "static/tab/home.png",
+        "selectedIconPath": "static/tab/home-active.png"
+      },
+      {
+        "pagePath": "pages/tabbar/community/index",
+        "text": "社区",
+        "iconPath": "static/tab/community.png",
+        "selectedIconPath": "static/tab/community-active.png"
+      },
+      {
+        "pagePath": "pages/tabbar/chat/index",
+        "text": "AI陪伴",
+        "iconPath": "static/tab/chat.png",
+        "selectedIconPath": "static/tab/chat-active.png"
+      },
+      {
+        "pagePath": "pages/tabbar/profile/index",
+        "text": "我的",
+        "iconPath": "static/tab/profile.png",
+        "selectedIconPath": "static/tab/profile-active.png"
+      }
+    ]
+  },
+  "globalStyle": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "心语陪伴",
+    "navigationBarBackgroundColor": "#ffffff",
+    "backgroundColor": "#f7f8fc"
+  }
+}
