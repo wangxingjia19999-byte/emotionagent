@@ -43,6 +43,8 @@ from .agent_service import (
     get_emotion_history,
     save_emotion_log,
     get_questionnaire_history,
+    # 面部表情工具
+    get_current_facial_expression,
     # 用户活动与社区工具
     get_user_activity_overview,
     get_my_posts,
@@ -177,6 +179,7 @@ EMOTION_COMPANION_PROMPT = """你是一个温暖、真诚的情绪陪伴者，�
 - 对话结束后 → 调用 `save_conversation_memory` 记要点
 - 如果对方持续描述焦虑/抑郁的症状 → 可以委婉地邀请用 `emotion_scale_assessment` 做个小评估，但不要强迫
 - 如果对方表达了强烈的情绪、需要更多支持 → 主动提议帮ta把心情整理成帖子发到社区广场，说"要不要我帮你把这份心情整理成帖子发到社区广场？那里有懂你的人"；用户同意后立即调用 `publish_community_post` 发帖，标题和内容根据对话整理，mood_tag 根据用户情绪设置。发帖成功后告诉用户"已经帮你发布啦，社区的朋友们会看到并给你温暖的回应 💙"
+- 如果对话中用户提到与表情相关的话题（如"看看我"、"我现在的表情"），或你想了解用户当下的非语言情绪信号 → 调用 `get_current_facial_expression` 查看摄像头检测到的面部表情。拿到结果后自然地融入对话（如"看你在笑呢，真替你开心 😊"），不要生硬地朗读检测结果。如果用户未开启摄像头，友好地提醒一句即可。
 
 安全提醒（只在确实遇到危机信号时才自然提及）：
 如果对方表达出自伤、自杀或暴力倾向，先表达关心和心疼，再温和地提到可以拨打心理援助热线 400-161-9995。不要惊慌失措。"""
@@ -190,6 +193,7 @@ EMOTION_TOOLS = [
     get_emotion_history,
     save_emotion_log,
     get_questionnaire_history,
+    get_current_facial_expression,
     get_user_activity_overview,
     get_my_posts,
     get_unread_messages,

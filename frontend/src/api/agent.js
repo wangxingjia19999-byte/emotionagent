@@ -69,3 +69,19 @@ export function getChatSessions(page = 1, pageSize = 20) {
 export function getChatSessionDetail(sessionId) {
   return request.get(`/agent/sessions/${sessionId}`)
 }
+
+/** 上传摄像头帧进行面部表情检测 */
+export function detectFacialExpression(imageBase64, userId = null) {
+  return request.post('/agent/facial-expression', {
+    image_base64: imageBase64,
+    user_id: userId,
+  })
+}
+
+/** 表情自动建议 — 检测到表情后触发 AI 回应 */
+export function getExpressionSuggestion(expression, expressionCn) {
+  return request.post('/agent/expression-suggestion', {
+    expression,
+    expression_cn: expressionCn,
+  })
+}

@@ -147,6 +147,9 @@
         <!-- 输入区 -->
         <div class="chat-input-area">
           <div class="chat-input-wrapper">
+            <FacialExpressionDetector
+              @expression-change="onExpressionChange"
+            />
             <textarea
               v-model="inputText"
               class="chat-input"
@@ -176,7 +179,8 @@ import { ref, nextTick, onMounted, onUnmounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ChatDotRound, MagicStick, Promotion, Plus, Clock, Back } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { chatWithMultiAgent, getChatSessions, getChatSessionDetail } from '@/api/agent'
+import { chatWithMultiAgent, getChatSessions, getChatSessionDetail, getExpressionSuggestion } from '@/api/agent'
+import FacialExpressionDetector from '@/components/FacialExpressionDetector.vue'
 
 const router = useRouter()
 const inputText = ref('')
@@ -185,6 +189,19 @@ const thinking = ref(false)
 const messagesContainer = ref(null)
 const showHistoryPanel = ref(false)
 const historyDropdownRef = ref(null)
+const currentExpression = ref(null)  // 摄像头检测到的当前表情
+
+// ── 表情自动建议状态 ──
+const exprTrack = {
+  label: null,          // 当前跟踪的表情标签
+  count: 0,             // 连续检测到同一表情的次数
+  threshold: 2,         // 连续多少次后触发建议
+  cooldownUntil: 0,     // 冷却期结束时间戳
+  cooldownMs: 30000,    // 冷却时长 (30秒)
+  lastTriggered: null,  // 上次触发的表情 (避免重复)
+}
+// 不需要对 neutral 触发的表情列表
+const SKIP_SUGGESTION_LABELS = ['neutral']
 
 const quickPrompts = [
   '今天心情不太好，能陪我聊聊吗？',
@@ -439,6 +456,84 @@ function scrollToBottom() {
       messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
     }
   })
+}
+
+// 面部表情变化回调 (来自 FacialExpressionDetector) — 含自动建议逻辑
+async function onExpressionChange(expr) {
+  currentExpression.value = expr
+  console.log('面部表情更新:', expr?.label_cn, expr?.label)
+
+  if (!expr || !expr.label) return
+
+  const label = expr.label
+
+  // ── 稳定性跟踪 ──
+  if (exprTrack.label === label) {
+    exprTrack.count++
+  } else {
+    exprTrack.label = label
+    exprTrack.count = 1
+  }
+
+  // ── 检查是否应该触发建议 ──
+  const now = Date.now()
+
+  // neutral 不触发
+  if (SKIP_SUGGESTION_LABELS.includes(label)) {
+    exprTrack.lastTriggered = null  // 重置，允许下次触发
+    return
+  }
+
+  // 冷却期内不触发
+  if (now < exprTrack.cooldownUntil) return
+
+  // 同一表情不重复触发 (除非上次触发的不是这个)
+  if (exprTrack.lastTriggered === label) return
+
+  // 连续检测次数不够不触发
+  if (exprTrack.count < exprTrack.threshold) return
+
+  // 正在思考中不触发
+  if (thinking.value) return
+
+  // ── 触发! ──
+  console.log(`🎯 表情自动触发: ${expr.label_cn} (连续${exprTrack.count}次)`)
+
+  thinking.value = true
+  try {
+    const res = await getExpressionSuggestion(label, expr.label_cn)
+    const data = res.data?.data || res.data || {}
+    const reply = data.reply || ''
+
+    if (reply) {
+      // 解析商品推荐
+      const products = parseProducts(reply)
+      const displayText = products.length ? cleanProductText(reply, products) : reply
+
+      messages.value.push({
+        role: 'assistant',
+        content: displayText,
+        time: getTime(),
+        agentUsed: data.agent_used || 'emotion_companion',
+        crisisDetected: data.crisis_detected || false,
+        expressionTriggered: true,  // 标记为表情触发
+        expressionLabel: label,
+        products,
+      })
+      scrollToBottom()
+    }
+
+    // 设置冷却和去重
+    exprTrack.cooldownUntil = now + exprTrack.cooldownMs
+    exprTrack.lastTriggered = label
+    exprTrack.label = null
+    exprTrack.count = 0
+  } catch (e) {
+    console.error('表情建议请求失败:', e)
+    // 静默处理，不打扰用户
+  } finally {
+    thinking.value = false
+  }
 }
 
 async function sendMessage(text) {
